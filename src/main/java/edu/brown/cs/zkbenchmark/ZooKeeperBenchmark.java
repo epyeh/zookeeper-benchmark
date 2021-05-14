@@ -10,16 +10,20 @@ import java.util.LinkedList;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.CyclicBarrier; // For synchronizing client threads
 import java.util.concurrent.atomic.AtomicInteger;
 
+// For config file parsing
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 
+// For config file getting
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+
+// For logging
 import org.apache.log4j.Appender;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
@@ -38,74 +42,97 @@ public class ZooKeeperBenchmark {
 	private long _lastCpuTime;
 	private long _currentCpuTime;
 	private long _startCpuTime;
-	private TestType _currentTest;	
+	private TestType _currentTest;
 	private String _data;
 	private BufferedWriter _rateFile;
 	private CyclicBarrier _barrier;
 	private Boolean _finished;
-	
+
 	enum TestType {
 		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED
 	}
 
 	private static final Logger LOG = Logger.getLogger(ZooKeeperBenchmark.class);
-	
+
 	public ZooKeeperBenchmark(Configuration conf) throws IOException {
 		LinkedList<String> serverList = new LinkedList<String>();
+
+		// Config file is structured:
+		// key:value
+		// totalTime=30000
+		// conf.get(totalTime) would give back 30000
+		// This command gets all the keys that have server in their name
 		Iterator<String> serverNames = conf.getKeys("server");
 
+		// Add server addresses to list
 		while (serverNames.hasNext()) {
 			String serverName = serverNames.next();
 			String address = conf.getString(serverName);
 			serverList.add(address);
 		}
-		
+
 		if (serverList.size() == 0) {
 			throw new IllegalArgumentException("ZooKeeper server addresses required");
 		}
-		
+
 		_interval = conf.getInt("interval");
 		_totalOps = conf.getInt("totalOperations");
 		_lowerbound = conf.getInt("lowerbound");
-		int totaltime = conf.getInt("totalTime");
+		int totaltime = conf.getInt("totalTime"); // total time is the time for each test
 		_totalTimeSeconds = Math.round((double) totaltime / 1000.0);
 		boolean sync = conf.getBoolean("sync");
-		
-		_running = new HashMap<Integer,Thread>();		
-		_clients = new BenchmarkClient[serverList.size()];
-		_barrier = new CyclicBarrier(_clients.length+1);
-		_deadline = totaltime / _interval;
-		
-		LOG.info("benchmark set with: interval: " + _interval + " total number: " + _totalOps +
-				" threshold: " + _lowerbound + " time: " + totaltime + " sync: " + (sync?"SYNC":"ASYNC"));
 
+		_running = new HashMap<Integer, Thread>(); // Hashmap of currently running threads
+		_clients = new BenchmarkClient[serverList.size()]; // Array of clients that connect to zookeeper servers. 1
+															// client per server
+															// ERIC: Why do they only have 1 client per server? Does
+															// this make sense?
+		_barrier = new CyclicBarrier(_clients.length + 1); // THIS IS NECESSARY TO SYNCHRONIZE ALL CLIENTS and the
+															// 'main' doTest function in this class.
+															// Only once _clients.length + 1 calls to _barrier.await()
+															// have executed, are ALL the threads released to begin
+															// making zookeeper requests
+															// it's _clients.length + 1 because doTest will call it also
+		_deadline = totaltime / _interval; // interval is the time between request rate measurements
+											// totaltime/ _interval gives the # of measurments we want to take
+
+		LOG.info("benchmark set with: interval: " + _interval + " total number: " + _totalOps + " threshold: "
+				+ _lowerbound + " time: " + totaltime + " sync: " + (sync ? "SYNC" : "ASYNC"));
+
+		// Create the data to be stored in the znodes
+		// ERIC: They don't vary data size. Interesting.
 		_data = "";
 
 		for (int i = 0; i < 20; i++) { // 100 bytes of important data
 			_data += "!!!!!";
 		}
 
+		// Calculate the average # of operations that need to be sent to each zookeeper
+		// server
 		int avgOps = _totalOps / serverList.size();
 
+		// Instantiate 1 client for each server
 		for (int i = 0; i < serverList.size(); i++) {
 			if (sync) {
+				// This is synchronous
 				_clients[i] = new SyncBenchmarkClient(this, serverList.get(i), "/zkTest", avgOps, i);
 			} else {
 				_clients[i] = new AsyncBenchmarkClient(this, serverList.get(i), "/zkTest", avgOps, i);
 			}
 		}
-		
+
 	}
-	
+
+	// Executes the benchmark
 	public void runBenchmark() {
 
-		/* Read requests are done by zookeeper extremely
-		 * quickly compared with write requests. If the time
-		 * interval and threshold are not chosen appropriately,
-		 * it could happen that when the timer awakes, all requests
-		 * have already been finished. In this case, the output
-		 * of read test doesn't reflect the actual rate of
-		 * read requests. */
+		/*
+		 * Read requests are done by zookeeper extremely quickly compared with write
+		 * requests. If the time interval and threshold are not chosen appropriately, it
+		 * could happen that when the timer awakes, all requests have already been
+		 * finished. In this case, the output of read test doesn't reflect the actual
+		 * rate of read requests.
+		 */
 		doTest(TestType.READ, "warm-up");
 
 		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
@@ -116,15 +143,15 @@ public class ZooKeeperBenchmark {
 
 		doTest(TestType.SETMULTI, "different znode write");
 
-		/* In the test, node creation and deletion tests are
-		 * done by creating a lot of nodes at first and then
-		 * deleting them. Since both of these two tests run
-		 * for a certain time, there is no guarantee that which
-		 * requests is more than the other. If there are more
-		 * delete requests than create requests, the extra delete
-		 * requests would end up not actually deleting anything.
-		 * Though these requests are sent and processed by
-		 * zookeeper server anyway, this could still be an issue.*/
+		/*
+		 * In the test, node creation and deletion tests are done by creating a lot of
+		 * nodes at first and then deleting them. Since both of these two tests run for
+		 * a certain time, there is no guarantee that which requests is more than the
+		 * other. If there are more delete requests than create requests, the extra
+		 * delete requests would end up not actually deleting anything. Though these
+		 * requests are sent and processed by zookeeper server anyway, this could still
+		 * be an issue.
+		 */
 		doTest(TestType.DELETE, "znode delete");
 
 		LOG.info("Tests completed, now cleaning-up");
@@ -148,9 +175,9 @@ public class ZooKeeperBenchmark {
 
 		LOG.info("All tests are complete");
 	}
-	
+
 	/* This is where each individual test starts */
-	
+
 	public void doTest(TestType test, String description) {
 		_currentTest = test;
 		_finishedTotal = new AtomicInteger(0);
@@ -160,42 +187,50 @@ public class ZooKeeperBenchmark {
 
 		System.out.print("Running " + description + " benchmark for " + _totalTimeSeconds + " seconds... ");
 
+		// Instantiate rate output file. This will be where the results go
 		try {
-			_rateFile = new BufferedWriter(new FileWriter(new File(test+".dat")));
+			_rateFile = new BufferedWriter(new FileWriter(new File(test + ".dat")));
 		} catch (IOException e) {
 			LOG.error("Unable to create output file", e);
 		}
-		
+
+		// These are just timestamps. This is not the actual timer
 		_startCpuTime = System.nanoTime();
 		_lastCpuTime = _startCpuTime;
 
-
 		// Start the testing clients!
-		
+
 		for (int i = 0; i < _clients.length; i++) {
-			_clients[i].setTest(test);
-			Thread tmp = new Thread(_clients[i]);			
-			_running.put(new Integer(i), tmp);
-			tmp.start();
+			_clients[i].setTest(test); // Set the test type
+			Thread tmp = new Thread(_clients[i]); // Create a new thread object
+			_running.put(new Integer(i), tmp); // Store the index and the thread object into the map
+			tmp.start(); // Start the thread
 		}
 
 		// Wait for clients to connect to their assigned server, and
 		// start timer which ensures we have outstanding requests.
-		
+
 		try {
 			_barrier.await();
 		} catch (BrokenBarrierException e) {
 			LOG.warn("Some other client was interrupted; Benchmark main thread is out of sync", e);
 		} catch (InterruptedException e) {
 			LOG.warn("Benchmark main thread was interrupted while waiting on barrier", e);
-		}		
-		
+		}
+
+		// Start the timer
 		Timer timer = new Timer();
-		timer.scheduleAtFixedRate(new ResubmitTimer() , _interval, _interval);
+
+		// After _interval milliseconds have passed, execute the function
+		// ResubmitTimer()
+		timer.scheduleAtFixedRate(new ResubmitTimer(), _interval, _interval);
 
 		// Wait for the test to finish
 
 		while (!_finished) {
+			// must be synchronized because multiple threads may try to delete
+			// their id from the map at the same time so we want to avoid concurrent write
+			// problem
 			synchronized (_running) {
 				try {
 					_running.wait();
@@ -206,10 +241,11 @@ public class ZooKeeperBenchmark {
 		}
 
 		// Test is finished
-
+		// Clean up test
 		_currentTest = TestType.UNDEFINED;
 		timer.cancel();
 
+		// Close files
 		try {
 			if (_rateFile != null) {
 				_rateFile.close();
@@ -218,10 +254,10 @@ public class ZooKeeperBenchmark {
 			LOG.warn("Error while closing output file", e);
 		}
 
+		// Print out total time taken for test
 		double time = getTime();
-		LOG.info(test + " finished, time elapsed (sec): " + time +
-				" operations: " + _finishedTotal.get() + " avg rate: " +
-				_finishedTotal.get()/time);
+		LOG.info(test + " finished, time elapsed (sec): " + time + " operations: " + _finishedTotal.get()
+				+ " avg rate: " + _finishedTotal.get() / time);
 
 		System.out.println("done");
 	}
@@ -229,13 +265,13 @@ public class ZooKeeperBenchmark {
 	/* return the max time consumed by each thread */
 	double getTime() {
 		double ret = 0;
-	
+
 		for (int i = 0; i < _clients.length; i++) {
 			if (ret < _clients[i].getTimeCount())
 				ret = _clients[i].getTimeCount();
 		}
 
-		return (ret * _interval)/1000.0;
+		return (ret * _interval) / 1000.0;
 	}
 
 	// TODO(adf): currently unused. should we keep it?
@@ -253,7 +289,8 @@ public class ZooKeeperBenchmark {
 	}
 
 	void incrementFinished() {
-		_finishedTotal.incrementAndGet();
+		_finishedTotal.incrementAndGet(); // There is no pure increment function. You must incrementAndGet
+											// even if you don't intend on using the returned back value
 	}
 
 	CyclicBarrier getBarrier() {
@@ -279,17 +316,22 @@ public class ZooKeeperBenchmark {
 	long getStartTime() {
 		return _startCpuTime;
 	}
-	
+
+	// Each thread will come back and tell _running to remove its id from the map
 	void notifyFinished(int id) {
 		synchronized (_running) {
 			_running.remove(new Integer(id));
+			// When _running size is 0, all thread have completed their requests
+			// Set _finished to be true (used in the while loop) and notify _running (ie
+			// wake it up)
+			// and make it check that _finished is true
 			if (_running.size() == 0) {
 				_finished = true;
 				_running.notify();
 			}
 		}
 	}
-	
+
 	private static PropertiesConfiguration initConfiguration(String[] args) {
 		OptionSet options = null;
 		OptionParser parser = new OptionParser();
@@ -297,19 +339,12 @@ public class ZooKeeperBenchmark {
 
 		// Setup the option parser
 		parser.accepts("help", "print this help statement");
-		parser.accepts("conf", "configuration file (required)").
-			withRequiredArg().ofType(String.class).required();
-		parser.accepts("interval", "interval between rate measurements").
-			withRequiredArg().ofType(Integer.class);
-		parser.accepts("ops", "total number of operations").
-			withRequiredArg().ofType(Integer.class);
-		parser.accepts("lbound",
-			"lowerbound for the number of operations").
-			withRequiredArg().ofType(Integer.class);
-		parser.accepts("time", "time tests will run for (milliseconds)").
-			withRequiredArg().ofType(Integer.class);
-		parser.accepts("sync", "sync or async test").
-			withRequiredArg().ofType(Boolean.class);
+		parser.accepts("conf", "configuration file (required)").withRequiredArg().ofType(String.class).required();
+		parser.accepts("interval", "interval between rate measurements").withRequiredArg().ofType(Integer.class);
+		parser.accepts("ops", "total number of operations").withRequiredArg().ofType(Integer.class);
+		parser.accepts("lbound", "lowerbound for the number of operations").withRequiredArg().ofType(Integer.class);
+		parser.accepts("time", "time tests will run for (milliseconds)").withRequiredArg().ofType(Integer.class);
+		parser.accepts("sync", "sync or async test").withRequiredArg().ofType(Boolean.class);
 
 		// Parse and gather the arguments
 		try {
@@ -329,7 +364,7 @@ public class ZooKeeperBenchmark {
 		Integer lowerbound = (Integer) options.valueOf("lbound");
 		Integer time = (Integer) options.valueOf("time");
 		Boolean sync = (Boolean) options.valueOf("sync");
-		
+
 		// Load and parse the configuration file
 		String configFile = (String) options.valueOf("conf");
 		LOG.info("Loading benchmark from configuration file: " + configFile);
@@ -356,6 +391,7 @@ public class ZooKeeperBenchmark {
 		return conf;
 	}
 
+	// Main where program execution starts
 	public static void main(String[] args) {
 
 		// Parse command line and configuration file
@@ -370,7 +406,10 @@ public class ZooKeeperBenchmark {
 
 		// Run the benchmark
 		try {
+			// Create zookeeper obj
 			ZooKeeperBenchmark benchmark = new ZooKeeperBenchmark(conf);
+
+			// Execute benchmark
 			benchmark.runBenchmark();
 		} catch (IOException e) {
 			LOG.error("Failed to start ZooKeeper benchmark", e);
@@ -379,47 +418,84 @@ public class ZooKeeperBenchmark {
 		System.exit(0);
 	}
 
+	// TimerTask is a class that is used with Timer. Allows for repeated
+	// execution by a Timer on a fixed interval
 	class ResubmitTimer extends TimerTask {
 		@Override
 		public void run() {
 			if (_currentTest == TestType.UNDEFINED) {
 				return;
 			}
+			// _finished is an atomic integer. .get() of atomic integer gives back the value
+			// int finished then represents the # of operations finished at the time
+			// _finishedTotal.get() is called
 
 			int finished = _finishedTotal.get();
 			if (finished == 0) {
 				return;
 			}
 
+			// Get current CPU time
 			_currentCpuTime = System.nanoTime();
 
+			// If output file exists
 			if (_rateFile != null) {
 				try {
 					if (finished - _lastfinished > 0) {
 						// Record the time elapsed and current rate
-						String msg = ((double)(_currentCpuTime - _startCpuTime)/1000000000.0) + " " +
-								((double)(finished - _lastfinished) /
-										((double)(_currentCpuTime - _lastCpuTime) / 1000000000.0));
-						_rateFile.write(msg+"\n");
+						String msg = ((double) (_currentCpuTime - _startCpuTime) / 1000000000.0) + " "
+								+ ((double) (finished - _lastfinished)
+										/ ((double) (_currentCpuTime - _lastCpuTime) / 1000000000.0));
+
+						// Break it down:
+						// This: ((double) (_currentCpuTime - _startCpuTime) / 1000000000.0)
+						// represents the total time elapsed since _startCpuTime is called. So the total
+						// time (in seconds)
+						// since the barrier for thread
+
+						// This: ((double) (finished - _lastfinished)
+						// represents the # of requests finished since the last call to ResubmitTimer
+						// So the total # of requests completed in this current time period
+						//
+
+						// This: ((double) (_currentCpuTime - _lastCpuTime) / 1000000000.0))
+						// represents the total time elapsed since the last call to ResubmitTimer
+						// (in seconds). (total time elapsed for this current time period)
+						_rateFile.write(msg + "\n");
 					}
 				} catch (IOException e) {
 					LOG.error("Error when writing to output file", e);
 				}
 			}
 
-			_lastCpuTime = _currentCpuTime;
-			_lastfinished = finished;
+			_lastCpuTime = _currentCpuTime; // Set _lastCpuTime to current cpuTime
+			_lastfinished = finished; // update _lastFinished to be the current # of finished requests
 
+			// _currentTotalOps represents the total # of operations we want to submit by
+			// this point
+			// Essentially it's the (# of intervals) * (avg operations/requests).
+			// finished is the current total # of operations/requests that have been
+			// completed
+			// numRemaining then means the number of requests BEHIND the ideal # of
+			// operations that should have been completed by now
 			int numRemaining = _currentTotalOps.get() - finished;
 
+			// If numRemaining requests is less than the lower bound, then we need to submit
+			// more requests.
+			// _lowerbound is set in the config file
 			if (numRemaining <= _lowerbound) {
+
+				// Use some fomrula to compute what the new avg is and resubmit it to all the
+				// clients. (essentially tell them to update the number of requests to send out
+				// at a time)
 				int incr = _totalOps - numRemaining;
 
 				_currentTotalOps.getAndAdd(incr);
 				int avg = incr / _clients.length;
 
 				for (int i = 0; i < _clients.length; i++) {
-					_clients[i].resubmit(avg);
+					_clients[i].resubmit(avg); // Abstract. Essentially, add avg to the total # of operations/requests
+												// client thread needs to complete
 				}
 			}
 		}
