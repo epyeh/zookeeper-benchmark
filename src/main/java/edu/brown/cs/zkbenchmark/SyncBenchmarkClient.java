@@ -34,12 +34,20 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 	protected void submitWrapped(int n, TestType type) throws Exception {
 		_syncfin = false;
 		_totalOps = _zkBenchmark.getCurrentTotalOps();
+		LOG.info("* Initial totalOps = " + _totalOps.get());
+		// System.out.println("* Initial totalOps = " + _totalOps.get());
 		byte data[];
 
 		// Eric: Why do they use _totalOps.get(). Why not just use n? What's the point
 		// of passing _attempts from BenchmarkClient? Shouldn't it be n?
 		// Every client shouldn't be looping over the total number of operations. it
 		// should be the average # of operations they need to complete
+
+		// I would say this is realy a nasty code. 
+		// As far as I can tell, 
+		// the _totalOps is the number of outstanding ops
+		// and forget about the initial value of _totalOps
+		// The stopping signal is _syncfin
 		for (int i = 0; i < _totalOps.get(); i++) {
 			double submitTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
