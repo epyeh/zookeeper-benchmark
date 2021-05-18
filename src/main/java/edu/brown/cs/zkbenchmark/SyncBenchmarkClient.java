@@ -1,10 +1,15 @@
 package edu.brown.cs.zkbenchmark;
 
+import java.io.File;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.util.Random;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.data.Stat;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -43,11 +48,24 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		// Every client shouldn't be looping over the total number of operations. it
 		// should be the average # of operations they need to complete
 
-		// I would say this is realy a nasty code. 
-		// As far as I can tell, 
+		// I would say this is realy a nasty code.
+		// As far as I can tell,
 		// the _totalOps is the number of outstanding ops
 		// and forget about the initial value of _totalOps
 		// The stopping signal is _syncfin
+
+		BufferedWriter readWriteDecisionFile = null;
+		if (type == TestType.MIXREADWRITE) {
+			readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
+					"results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() + "-read-write.dat")));
+		}
+
+		int numToRead = this._zkBenchmark.getNumToRead();
+		int numToWrite = 20 - numToRead;
+
+		int currRead = numToRead;
+		int currWrite = numToWrite;
+
 		for (int i = 0; i < _totalOps.get(); i++) {
 			double submitTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
@@ -104,6 +122,59 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 							LOG.debug("No such node (" + _path + "/" + _count + ") when deleting nodes", e);
 						}
 					}
+					break;
+
+				// Case for trying to do mixed reads and writes to nodes
+				case MIXREADWRITE:
+					// int numToRead = this._zkBenchmark.getNumToRead();
+					// Random rand = new Random();
+					// int randInt = rand.nextInt(100);
+					// int readThreshold = this._zkBenchmark.getReadPercentage();
+
+					try {
+
+						if (currRead != 0) {
+							readWriteDecisionFile.write("read\n");
+							_client.getData().forPath(_path + "/read");
+							currRead--;
+						} else {
+							readWriteDecisionFile.write("write\n");
+							data = new String(_zkBenchmark.getData() + i).getBytes();
+							_client.setData().forPath(_path + "/write", data);
+							currWrite--;
+						}
+
+						if (currRead == 0 && currWrite == 0) {
+							currRead = numToRead;
+							currWrite = numToWrite;
+						}
+
+						// Perform a read
+						// if (randInt < readThreshold) {
+						// // For debug
+						// readWriteDecisionFile.write("read\n");
+						// _client.getData().forPath(_path + "/read");
+						// }
+						// // Perform a write
+						// else {
+						// // For debug
+						// readWriteDecisionFile.write("write\n");
+						// data = new String(_zkBenchmark.getData() + i).getBytes();
+						// _client.setData().forPath(_path + "/write", data);
+						// }
+						// _client.delete().forPath(_path + "/" + _count);
+					} catch (Exception e) {
+						if (LOG.isDebugEnabled()) {
+							LOG.debug("Could not write or read due to error:", e);
+						}
+					}
+					break;
+				case UNDEFINED:
+					LOG.error("Test type was UNDEFINED. No tests executed");
+					break;
+				default:
+					LOG.error("Unknown Test Type.");
+
 			}
 
 			recordElapsedInterval(new Double(submitTime));
@@ -117,9 +188,25 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 			// This is called in BenchmarkClient under FinishTimer.
 			// Finish Timer cancels the timer and then tells the sync client to stop issuing
 			// requests by breaking out
-			if (_syncfin)
+			if (_syncfin) {
+				try {
+					if (readWriteDecisionFile != null) {
+						readWriteDecisionFile.close();
+					}
+				} catch (IOException e) {
+					LOG.warn("Error while closing readWriteDecision file:", e);
+				}
 				break;
+			}
+
 		}
+		// try {
+		// if (readWriteDecisionFile != null) {
+		// readWriteDecisionFile.close();
+		// }
+		// } catch (IOException e) {
+		// LOG.warn("Error while closing readWriteDecision file:", e);
+		// }
 
 	}
 

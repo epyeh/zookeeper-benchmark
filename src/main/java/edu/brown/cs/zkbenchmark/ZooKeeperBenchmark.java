@@ -47,9 +47,11 @@ public class ZooKeeperBenchmark {
 	private BufferedWriter _rateFile;
 	private CyclicBarrier _barrier;
 	private Boolean _finished;
+	private int _readPercentage;
+	private int _numtoRead;
 
 	enum TestType {
-		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED
+		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE
 	}
 
 	private static final Logger LOG = Logger.getLogger(ZooKeeperBenchmark.class);
@@ -126,6 +128,12 @@ public class ZooKeeperBenchmark {
 	// Executes the benchmark
 	public void runBenchmark() {
 
+		// Create results directory if it doesn't exist
+		File directory = new File("./results");
+		if (!directory.exists()) {
+			directory.mkdir();
+		}
+
 		/*
 		 * Read requests are done by zookeeper extremely quickly compared with write
 		 * requests. If the time interval and threshold are not chosen appropriately, it
@@ -137,11 +145,22 @@ public class ZooKeeperBenchmark {
 
 		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
+		// This loop increments i by 5% each time. i represents the read percentage. ie
+		// the percentage of reads for this workload
+
+		// for (int i = 0; i <= 100; i += 5) {
+
+		// for (int i = 0; i <= 100; i += 5) {
+		// _numtoRead = i / 5;
+		// _readPercentage = i;
+		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+		// }
+
 		doTest(TestType.SETSINGLE, "repeated single-znode write");
 
-		doTest(TestType.CREATE, "znode create");
+		// doTest(TestType.CREATE, "znode create");
 
-		doTest(TestType.SETMULTI, "different znode write");
+		// doTest(TestType.SETMULTI, "different znode write");
 
 		/*
 		 * In the test, node creation and deletion tests are done by creating a lot of
@@ -152,7 +171,7 @@ public class ZooKeeperBenchmark {
 		 * requests are sent and processed by zookeeper server anyway, this could still
 		 * be an issue.
 		 */
-		doTest(TestType.DELETE, "znode delete");
+		// doTest(TestType.DELETE, "znode delete");
 
 		LOG.info("Tests completed, now cleaning-up");
 
@@ -187,9 +206,19 @@ public class ZooKeeperBenchmark {
 
 		System.out.print("Running " + description + " benchmark for " + _totalTimeSeconds + " seconds... ");
 
+		if (_currentTest == TestType.MIXREADWRITE) {
+			System.out.print(" and a readPercentage of:" + _readPercentage + "% ");
+		}
+
 		// Instantiate rate output file. This will be where the results go
 		try {
-			_rateFile = new BufferedWriter(new FileWriter(new File(test + ".dat")));
+			if (_currentTest != TestType.MIXREADWRITE) {
+				_rateFile = new BufferedWriter(new FileWriter(new File("results/" + test + ".dat")));
+			} else {
+				_rateFile = new BufferedWriter(
+						new FileWriter(new File("results/" + test + "-" + _readPercentage + ".dat")));
+			}
+
 		} catch (IOException e) {
 			LOG.error("Unable to create output file", e);
 		}
@@ -311,6 +340,14 @@ public class ZooKeeperBenchmark {
 
 	int getInterval() {
 		return _interval;
+	}
+
+	int getReadPercentage() {
+		return this._readPercentage;
+	}
+
+	int getNumToRead() {
+		return this._numtoRead;
 	}
 
 	long getStartTime() {
