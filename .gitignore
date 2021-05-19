@@ -9,3 +9,9 @@ target/
 
 # python side effects
 **/*.pyc
+
+# ignore data
+/results
+
+# ignore local log
+zk-benchmark.log
