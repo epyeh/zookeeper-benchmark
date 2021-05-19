@@ -149,13 +149,11 @@ public class ZooKeeperBenchmark {
 
 		// for (int i = 0; i <= 4; i += 5) {
 		// for (int i = 0; i <= 100; i += 5) {
-		for (int i = 0; i <= 100; i += 10) {
+		for (int i = 0; i <= 100; i += 5) {
 			_numtoRead = i / 5;
 			_readPercentage = i / 100.0;
 			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		}
-
-		
 
 		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
