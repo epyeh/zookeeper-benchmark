@@ -153,13 +153,15 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 					if (randDouble < readThreshold) {
 						// _readWriteDecisionFile.write("read\n");
 						// _client.getData().inBackground(new Double(time)).forPath(_path);
-						_client.getData().inBackground(new Double(time)).forPath(_path);
+						// _client.getData().inBackground(new Double(time)).forPath(_path);
+						_client.getData().inBackground(new Double(time)).forPath(_path + "/read");
 
 					} else {
 						// _readWriteDecisionFile.write("write\n");
 						data = new String(_zkBenchmark.getData() + i).getBytes();
 						// _client.setData().inBackground(new Double(time)).forPath(_path, data);
-						_client.setData().inBackground(new Double(time)).forPath(_path, data);
+						// _client.setData().inBackground(new Double(time)).forPath(_path, data);
+						_client.setData().inBackground(new Double(time)).forPath(_path + "/write", data);
 					}
 
 					// if (currRead != 0) {

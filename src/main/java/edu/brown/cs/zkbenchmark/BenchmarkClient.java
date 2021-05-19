@@ -147,8 +147,9 @@ public abstract class BenchmarkClient implements Runnable {
 			} else if (_type == TestType.MIXREADWRITE) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/" + _id + "-" + _type + "-"
 						+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
-				_readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
-						"results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() + "-read-write.dat")));
+				// _readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
+				// "results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() +
+				// "-read-write.dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}
