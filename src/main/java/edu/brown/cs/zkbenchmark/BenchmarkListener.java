@@ -27,6 +27,7 @@ class BenchmarkListener implements CuratorListener {
 				|| (type == CuratorEventType.CREATE && _client.getBenchmark().getCurrentTest() == TestType.CREATE)
 				|| (type == CuratorEventType.GET_DATA
 						&& _client.getBenchmark().getCurrentTest() == TestType.MIXREADWRITE)
+
 				|| (type == CuratorEventType.SET_DATA
 						&& _client.getBenchmark().getCurrentTest() == TestType.MIXREADWRITE)) {
 

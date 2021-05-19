@@ -47,7 +47,7 @@ public class ZooKeeperBenchmark {
 	private BufferedWriter _rateFile;
 	private CyclicBarrier _barrier;
 	private Boolean _finished;
-	private int _readPercentage;
+	private double _readPercentage;
 	private int _numtoRead;
 
 	enum TestType {
@@ -141,9 +141,6 @@ public class ZooKeeperBenchmark {
 		 * finished. In this case, the output of read test doesn't reflect the actual
 		 * rate of read requests.
 		 */
-		doTest(TestType.READ, "warm-up");
-
-		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
 		// This loop increments i by 5% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
@@ -151,11 +148,31 @@ public class ZooKeeperBenchmark {
 		// for (int i = 0; i <= 4; i += 5) {
 
 		// for (int i = 0; i <= 100; i += 5) {
-		for (int i = 0; i <= 100; i += 5) {
+		for (int i = 0; i <= 100; i += 10) {
 			_numtoRead = i / 5;
-			_readPercentage = i;
+			_readPercentage = i / 100.0;
 			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		}
+
+		doTest(TestType.READ, "warm-up");
+
+		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
+
+		// _numtoRead = 0 / 5;
+		// _readPercentage = 0 / 100.0;
+		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+
+		// _numtoRead = 25 / 5;
+		// _readPercentage = 25 / 100.0;
+		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+
+		// _numtoRead = 50 / 5;
+		// _readPercentage = 50 / 100.0;
+		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+
+		// _numtoRead = 100 / 5;
+		// _readPercentage = 100 / 100.0;
+		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 
 		doTest(TestType.SETSINGLE, "repeated single-znode write");
 
@@ -343,7 +360,7 @@ public class ZooKeeperBenchmark {
 		return _interval;
 	}
 
-	int getReadPercentage() {
+	double getReadPercentage() {
 		return this._readPercentage;
 	}
 
