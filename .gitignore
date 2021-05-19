@@ -8,7 +8,7 @@ target/
 *.ear
 
 # python side effects
-/__pycache__
+/analysis/__pycache__
 **/*.pyc
 
 # local results
