@@ -48,7 +48,6 @@ public class ZooKeeperBenchmark {
 	private CyclicBarrier _barrier;
 	private Boolean _finished;
 	private double _readPercentage;
-	private int _numtoRead;
 
 	enum TestType {
 		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE
@@ -144,40 +143,20 @@ public class ZooKeeperBenchmark {
 
 		doTest(TestType.READ, "warm-up");
 
-		// This loop increments i by 5% each time. i represents the read percentage. ie
-		// the percentage of reads for this workload
+		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
-		// for (int i = 0; i <= 4; i += 5) {
-		// for (int i = 0; i <= 100; i += 5) {
-		for (int i = 0; i <= 100; i += 5) {
-			_numtoRead = i / 5;
+		// This loop increments i by 10% each time. i represents the read percentage. ie
+		// the percentage of reads for this workload
+		for (int i = 0; i <= 100; i += 10) {
 			_readPercentage = i / 100.0;
 			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		}
 
-		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
+		doTest(TestType.SETSINGLE, "repeated single-znode write");
 
-		// _numtoRead = 0 / 5;
-		// _readPercentage = 0 / 100.0;
-		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+		doTest(TestType.CREATE, "znode create");
 
-		// _numtoRead = 25 / 5;
-		// _readPercentage = 25 / 100.0;
-		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
-
-		// _numtoRead = 50 / 5;
-		// _readPercentage = 50 / 100.0;
-		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
-
-		// _numtoRead = 100 / 5;
-		// _readPercentage = 100 / 100.0;
-		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
-
-		// doTest(TestType.SETSINGLE, "repeated single-znode write");
-
-		// doTest(TestType.CREATE, "znode create");
-
-		// doTest(TestType.SETMULTI, "different znode write");
+		doTest(TestType.SETMULTI, "different znode write");
 
 		/*
 		 * In the test, node creation and deletion tests are done by creating a lot of
@@ -188,7 +167,7 @@ public class ZooKeeperBenchmark {
 		 * requests are sent and processed by zookeeper server anyway, this could still
 		 * be an issue.
 		 */
-		// doTest(TestType.DELETE, "znode delete");
+		doTest(TestType.DELETE, "znode delete");
 
 		LOG.info("Tests completed, now cleaning-up");
 
@@ -229,11 +208,14 @@ public class ZooKeeperBenchmark {
 
 		// Instantiate rate output file. This will be where the results go
 		try {
-			if (_currentTest != TestType.MIXREADWRITE) {
+			if (_currentTest == TestType.READ || _currentTest == TestType.SETSINGLE || _currentTest == TestType.SETMULTI
+					|| _currentTest == TestType.CREATE || _currentTest == TestType.DELETE) {
 				_rateFile = new BufferedWriter(new FileWriter(new File("results/" + test + ".dat")));
-			} else {
+			} else if (_currentTest == TestType.MIXREADWRITE) {
 				_rateFile = new BufferedWriter(
 						new FileWriter(new File("results/" + test + "-" + _readPercentage + ".dat")));
+			} else {
+				LOG.error("Unknown test type");
 			}
 
 		} catch (IOException e) {
@@ -361,10 +343,6 @@ public class ZooKeeperBenchmark {
 
 	double getReadPercentage() {
 		return this._readPercentage;
-	}
-
-	int getNumToRead() {
-		return this._numtoRead;
 	}
 
 	long getStartTime() {
@@ -539,7 +517,8 @@ public class ZooKeeperBenchmark {
 			// _lowerbound is set in the config file
 			if (numRemaining <= _lowerbound) {
 				// Yaosen, ToDo
-				System.out.println("**** this should never be called in the asynchronous situation if tuned ****");
+				// System.out.println("**** this should never be called in the asynchronous
+				// situation if tuned ****");
 				// Use some fomrula to compute what the new avg is and resubmit it to all the
 				// clients. (essentially tell them to update the number of requests to send out
 				// at a time)

@@ -54,19 +54,6 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		// and forget about the initial value of _totalOps
 		// The stopping signal is _syncfin
 
-		// BufferedWriter readWriteDecisionFile = null;
-		// if (type == TestType.MIXREADWRITE) {
-		// readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
-		// "results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() +
-		// "-read-write.dat")));
-		// }
-
-		int numToRead = this._zkBenchmark.getNumToRead();
-		int numToWrite = 20 - numToRead;
-
-		int currRead = numToRead;
-		int currWrite = numToWrite;
-
 		for (int i = 0; i < _totalOps.get(); i++) {
 			double submitTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
@@ -125,51 +112,6 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					}
 					break;
 
-				// Case for trying to do mixed reads and writes to nodes
-				case MIXREADWRITE:
-					// int numToRead = this._zkBenchmark.getNumToRead();
-					// Random rand = new Random();
-					// int randInt = rand.nextInt(100);
-					// int readThreshold = this._zkBenchmark.getReadPercentage();
-
-					try {
-
-						if (currRead != 0) {
-							_readWriteDecisionFile.write("read\n");
-							_client.getData().forPath(_path + "/read");
-							currRead--;
-						} else {
-							_readWriteDecisionFile.write("write\n");
-							data = new String(_zkBenchmark.getData() + i).getBytes();
-							_client.setData().forPath(_path + "/write", data);
-							currWrite--;
-						}
-
-						if (currRead == 0 && currWrite == 0) {
-							currRead = numToRead;
-							currWrite = numToWrite;
-						}
-
-						// Perform a read
-						// if (randInt < readThreshold) {
-						// // For debug
-						// readWriteDecisionFile.write("read\n");
-						// _client.getData().forPath(_path + "/read");
-						// }
-						// // Perform a write
-						// else {
-						// // For debug
-						// readWriteDecisionFile.write("write\n");
-						// data = new String(_zkBenchmark.getData() + i).getBytes();
-						// _client.setData().forPath(_path + "/write", data);
-						// }
-						// _client.delete().forPath(_path + "/" + _count);
-					} catch (Exception e) {
-						if (LOG.isDebugEnabled()) {
-							LOG.debug("Could not write or read due to error:", e);
-						}
-					}
-					break;
 				case UNDEFINED:
 					LOG.error("Test type was UNDEFINED. No tests executed");
 					break;
@@ -190,25 +132,9 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 			// Finish Timer cancels the timer and then tells the sync client to stop issuing
 			// requests by breaking out
 			if (_syncfin) {
-				// try {
-				// if (readWriteDecisionFile != null) {
-				// readWriteDecisionFile.close();
-				// }
-				// } catch (IOException e) {
-				// LOG.warn("Error while closing readWriteDecision file:", e);
-				// }
 				break;
 			}
-
 		}
-		// try {
-		// if (readWriteDecisionFile != null) {
-		// readWriteDecisionFile.close();
-		// }
-		// } catch (IOException e) {
-		// LOG.warn("Error while closing readWriteDecision file:", e);
-		// }
-
 	}
 
 	@Override

@@ -44,7 +44,6 @@ public abstract class BenchmarkClient implements Runnable {
 	protected int _highestDeleted;
 
 	protected BufferedWriter _latenciesFile;
-	protected BufferedWriter _readWriteDecisionFile;
 
 	private static final Logger LOG = Logger.getLogger(BenchmarkClient.class);
 
@@ -109,23 +108,6 @@ public abstract class BenchmarkClient implements Runnable {
 				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
 			}
 
-			// Check if read and write path exist. Read and write paths are disjoint
-			if (_type == TestType.MIXREADWRITE) {
-				String readPath = _path + "/read";
-				String writePath = _path + "/write";
-
-				// Check if read and write path exist. Read and write paths are disjoint
-				stat = _client.checkExists().forPath(readPath);
-				if (stat == null) {
-					_client.create().forPath(readPath, _zkBenchmark.getData().getBytes());
-				}
-
-				stat = _client.checkExists().forPath(writePath);
-				if (stat == null) {
-					_client.create().forPath(writePath, _zkBenchmark.getData().getBytes());
-				}
-			}
-
 		} catch (Exception e) {
 			LOG.error("Error while creating working directory", e);
 		}
@@ -141,15 +123,13 @@ public abstract class BenchmarkClient implements Runnable {
 		// Create a new output file for this particular client
 		try {
 
-			if (_type != TestType.MIXREADWRITE) {
+			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
+					|| _type == TestType.CREATE || _type == TestType.DELETE) {
 				_latenciesFile = new BufferedWriter(
 						new FileWriter(new File("results/" + _id + "-" + _type + "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/" + _id + "-" + _type + "-"
 						+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
-				// _readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
-				// "results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() +
-				// "-read-write.dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}
@@ -171,9 +151,6 @@ public abstract class BenchmarkClient implements Runnable {
 		try {
 			if (_latenciesFile != null)
 				_latenciesFile.close();
-			if (_readWriteDecisionFile != null) {
-				_readWriteDecisionFile.close();
-			}
 		} catch (IOException e) {
 			LOG.warn("Error while closing output file:", e);
 		}

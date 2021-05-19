@@ -69,22 +69,6 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 	private void submitRequestsWrapped(int n, TestType type) throws Exception {
 		byte data[];
 
-		// BufferedWriter readWriteDecisionFile = null;
-		// if (type == TestType.MIXREADWRITE) {
-		// readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
-		// "results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() +
-		// "-read-write.dat")));
-		// }
-
-		// int numToRead = this._zkBenchmark.getNumToRead();
-		// int numToWrite = 20 - numToRead;
-
-		// int currRead = numToRead;
-		// int currWrite = numToWrite;
-
-		// Random rand = new Random();
-		// int randInt = rand.nextInt(100);
-
 		for (int i = 0; i < n; i++) {
 			double time = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
@@ -124,71 +108,23 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 
 				// Case for trying to do mixed reads and writes to nodes
 				case MIXREADWRITE:
-					// System.out.println("Made it");
-					// _client.getData().inBackground(new Double(time)).forPath(_path);
 
 					double randDouble = Math.random();
 					double readThreshold = this._zkBenchmark.getReadPercentage();
-					// if (Double.compare(readThreshold, 0.0) == 0) {
-					// data = new String(_zkBenchmark.getData() + i).getBytes();
-					// _client.setData().inBackground(new Double(time)).forPath(_path, data);
-					// } else if (Double.compare(readThreshold, 1.0) == 0) {
-					// _client.getData().inBackground(new Double(time)).forPath(_path);
-					// } else if (randDouble < readThreshold) {
-					// // _readWriteDecisionFile.write("read\n");
-					// // _client.getData().inBackground(new Double(time)).forPath(_path);
-					// // _client.getData().inBackground(new Double(time)).forPath(_path + "/read");
-					// _client.getData().inBackground(new Double(time)).forPath(_path);
-					// } else {
-					// // _readWriteDecisionFile.write("write\n");
-					// data = new String(_zkBenchmark.getData() + i).getBytes();
-					// // _client.setData().inBackground(new Double(time)).forPath(_path, data);
-					// // _client.setData().inBackground(new Double(time)).forPath(_path + "/write",
-					// // data);
-					// _client.setData().inBackground(new Double(time)).forPath(_path, data);
-					// }
-
-					// _client.getData().inBackground(new Double(time)).forPath(_path);
 
 					if (randDouble < readThreshold) {
-						// _readWriteDecisionFile.write("read\n");
-						// _client.getData().inBackground(new Double(time)).forPath(_path);
-						// _client.getData().inBackground(new Double(time)).forPath(_path);
 						_client.getData().inBackground(new Double(time)).forPath(_path);
-
 					} else {
-						// _readWriteDecisionFile.write("write\n");
 						data = new String(_zkBenchmark.getData() + i).getBytes();
-						// _client.setData().inBackground(new Double(time)).forPath(_path, data);
-						// _client.setData().inBackground(new Double(time)).forPath(_path, data);
 						_client.setData().inBackground(new Double(time)).forPath(_path, data);
 					}
-
-					// if (currRead != 0) {
-					// _readWriteDecisionFile.write("read\n");
-					// _client.getData().inBackground(new Double(time)).forPath(_path);
-					// currRead--;
-					// } else {
-					// _readWriteDecisionFile.write("write\n");
-					// data = new String(_zkBenchmark.getData() + i).getBytes();
-					// _client.setData().inBackground(new Double(time)).forPath(_path, data);
-					// // data = new String(_zkBenchmark.getData() + i).getBytes();
-					// // _client.setData().forPath(_path + "/write", data);
-					// currWrite--;
-					// }
-
-					// if (currRead == 0 && currWrite == 0) {
-					// currRead = numToRead;
-					// currWrite = numToWrite;
-					// }
-
 					break;
 
-				// case UNDEFINED:
-				// LOG.error("Test type was UNDEFINED. No tests executed");
-				// break;
-				// default:
-				// LOG.error("Unknown Test Type.");
+				case UNDEFINED:
+					LOG.error("Test type was UNDEFINED. No tests executed");
+					break;
+				default:
+					LOG.error("Unknown Test Type.");
 			}
 			_count++;
 		}
