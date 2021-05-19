@@ -142,11 +142,12 @@ public class ZooKeeperBenchmark {
 		 * rate of read requests.
 		 */
 
+		doTest(TestType.READ, "warm-up");
+
 		// This loop increments i by 5% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
 
 		// for (int i = 0; i <= 4; i += 5) {
-
 		// for (int i = 0; i <= 100; i += 5) {
 		for (int i = 0; i <= 100; i += 10) {
 			_numtoRead = i / 5;
@@ -154,9 +155,9 @@ public class ZooKeeperBenchmark {
 			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		}
 
-		doTest(TestType.READ, "warm-up");
+		
 
-		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
+		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
 		// _numtoRead = 0 / 5;
 		// _readPercentage = 0 / 100.0;
@@ -174,7 +175,7 @@ public class ZooKeeperBenchmark {
 		// _readPercentage = 100 / 100.0;
 		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 
-		doTest(TestType.SETSINGLE, "repeated single-znode write");
+		// doTest(TestType.SETSINGLE, "repeated single-znode write");
 
 		// doTest(TestType.CREATE, "znode create");
 
@@ -539,7 +540,8 @@ public class ZooKeeperBenchmark {
 			// more requests.
 			// _lowerbound is set in the config file
 			if (numRemaining <= _lowerbound) {
-
+				// Yaosen, ToDo
+				System.out.println("**** this should never be called in the asynchronous situation if tuned ****");
 				// Use some fomrula to compute what the new avg is and resubmit it to all the
 				// clients. (essentially tell them to update the number of requests to send out
 				// at a time)
