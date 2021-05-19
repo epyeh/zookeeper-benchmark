@@ -1,5 +1,8 @@
 package edu.brown.cs.zkbenchmark;
 
+import java.io.File;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 
 import org.apache.log4j.Logger;
@@ -11,31 +14,31 @@ import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
 public class AsyncBenchmarkClient extends BenchmarkClient {
 
-	private class Monitor { }
-	
+	private class Monitor {
+	}
+
 	TestType _currentType = TestType.UNDEFINED;
 	private Monitor _monitor = new Monitor();
 	private boolean _asyncRunning;
 
 	private static final Logger LOG = Logger.getLogger(AsyncBenchmarkClient.class);
 
-
-	public AsyncBenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace,
-			int attempts, int id) throws IOException {
+	public AsyncBenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
+			throws IOException {
 		super(zkBenchmark, host, namespace, attempts, id);
 	}
-	
-	
+
 	@Override
 	protected void submit(int n, TestType type) {
-		ListenerContainer<CuratorListener> listeners = (ListenerContainer<CuratorListener>)_client.getCuratorListenable();
+		ListenerContainer<CuratorListener> listeners = (ListenerContainer<CuratorListener>) _client
+				.getCuratorListenable();
 		BenchmarkListener listener = new BenchmarkListener(this);
 		listeners.addListener(listener);
 		_currentType = type;
 		_asyncRunning = true;
-		
+
 		submitRequests(n, type);
-		
+
 		synchronized (_monitor) {
 			while (_asyncRunning) {
 				try {
@@ -55,8 +58,8 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 		} catch (Exception e) {
 			// What can you do? for some reason
 			// com.netflix.curator.framework.api.Pathable.forPath() throws Exception
-			
-			//just log the error, not sure how to handle this exception correctly
+
+			// just log the error, not sure how to handle this exception correctly
 			LOG.error("Exception while submitting requests", e);
 		}
 	}
@@ -64,8 +67,21 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 	private void submitRequestsWrapped(int n, TestType type) throws Exception {
 		byte data[];
 
+		// BufferedWriter readWriteDecisionFile = null;
+		// if (type == TestType.MIXREADWRITE) {
+		// readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
+		// "results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() +
+		// "-read-write.dat")));
+		// }
+
+		int numToRead = this._zkBenchmark.getNumToRead();
+		int numToWrite = 20 - numToRead;
+
+		int currRead = numToRead;
+		int currWrite = numToWrite;
+
 		for (int i = 0; i < n; i++) {
-			double time = ((double)System.nanoTime() - _zkBenchmark.getStartTime())/1000000000.0;
+			double time = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
 			switch (type) {
 				case READ:
@@ -74,20 +90,17 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 
 				case SETSINGLE:
 					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.setData().inBackground(new Double(time)).forPath(
-							_path, data);
+					_client.setData().inBackground(new Double(time)).forPath(_path, data);
 					break;
 
 				case SETMULTI:
 					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.setData().inBackground(new Double(time)).forPath(
-							_path + "/" + (_count % _highestN), data);
+					_client.setData().inBackground(new Double(time)).forPath(_path + "/" + (_count % _highestN), data);
 					break;
 
 				case CREATE:
 					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.create().inBackground(new Double(time)).forPath(
-							_path + "/" + _count, data);
+					_client.create().inBackground(new Double(time)).forPath(_path + "/" + _count, data);
 					_highestN++;
 					break;
 
@@ -96,18 +109,55 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 					_highestDeleted++;
 
 					if (_highestDeleted >= _highestN) {
-						zkAdminCommand("stat");							
+						zkAdminCommand("stat");
 						_zkBenchmark.notifyFinished(_id);
 						_timer.cancel();
 						_count++;
 						return;
 					}
+					break;
+
+				// Case for trying to do mixed reads and writes to nodes
+				case MIXREADWRITE:
+					// System.out.println("Made it");
+					try {
+
+						if (currRead != 0) {
+							_readWriteDecisionFile.write("read\n");
+							_client.getData().inBackground(new Double(time)).forPath(_path);
+							currRead--;
+						} else {
+							_readWriteDecisionFile.write("write\n");
+							data = new String(_zkBenchmark.getData() + i).getBytes();
+							_client.setData().inBackground(new Double(time)).forPath(_path, data);
+							// data = new String(_zkBenchmark.getData() + i).getBytes();
+							// _client.setData().forPath(_path + "/write", data);
+							currWrite--;
+						}
+
+						if (currRead == 0 && currWrite == 0) {
+							currRead = numToRead;
+							currWrite = numToWrite;
+						}
+
+					} catch (Exception e) {
+						if (LOG.isDebugEnabled()) {
+							LOG.debug("Could not write or read due to error:", e);
+						}
+					}
+					break;
+
+				case UNDEFINED:
+					LOG.error("Test type was UNDEFINED. No tests executed");
+					break;
+				default:
+					LOG.error("Unknown Test Type.");
 			}
 			_count++;
 		}
 
 	}
-	
+
 	@Override
 	protected void finish() {
 		synchronized (_monitor) {

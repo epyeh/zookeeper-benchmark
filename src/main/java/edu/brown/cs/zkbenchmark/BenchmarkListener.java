@@ -17,16 +17,22 @@ class BenchmarkListener implements CuratorListener {
 	@Override
 	public void eventReceived(CuratorFramework client, CuratorEvent event) {
 		CuratorEventType type = event.getType();
-
+		// System.out.println("type is: " + type + " curr test is: " +
+		// _client.getBenchmark().getCurrentTest());
 		// Ensure that the event is reply to current test
-		if ((type == CuratorEventType.GET_DATA && _client.getBenchmark().getCurrentTest() == TestType.READ) ||
-			(type == CuratorEventType.SET_DATA && _client.getBenchmark().getCurrentTest() == TestType.SETMULTI) ||
-			(type == CuratorEventType.SET_DATA && _client.getBenchmark().getCurrentTest() == TestType.SETSINGLE) ||
-			(type == CuratorEventType.DELETE && _client.getBenchmark().getCurrentTest() == TestType.DELETE) ||
-			(type == CuratorEventType.CREATE && _client.getBenchmark().getCurrentTest() == TestType.CREATE)) {
-				_client.getBenchmark().incrementFinished();
-				_client.recordEvent(event);
-				_client.resubmit(1);
+		if ((type == CuratorEventType.GET_DATA && _client.getBenchmark().getCurrentTest() == TestType.READ)
+				|| (type == CuratorEventType.SET_DATA && _client.getBenchmark().getCurrentTest() == TestType.SETMULTI)
+				|| (type == CuratorEventType.SET_DATA && _client.getBenchmark().getCurrentTest() == TestType.SETSINGLE)
+				|| (type == CuratorEventType.DELETE && _client.getBenchmark().getCurrentTest() == TestType.DELETE)
+				|| (type == CuratorEventType.CREATE && _client.getBenchmark().getCurrentTest() == TestType.CREATE)
+				|| (type == CuratorEventType.GET_DATA
+						&& _client.getBenchmark().getCurrentTest() == TestType.MIXREADWRITE)
+				|| (type == CuratorEventType.SET_DATA
+						&& _client.getBenchmark().getCurrentTest() == TestType.MIXREADWRITE)) {
+
+			_client.getBenchmark().incrementFinished();
+			_client.recordEvent(event);
+			_client.resubmit(1);
 		}
-	}			
+	}
 }

@@ -44,6 +44,7 @@ public abstract class BenchmarkClient implements Runnable {
 	protected int _highestDeleted;
 
 	protected BufferedWriter _latenciesFile;
+	protected BufferedWriter _readWriteDecisionFile;
 
 	private static final Logger LOG = Logger.getLogger(BenchmarkClient.class);
 
@@ -143,9 +144,13 @@ public abstract class BenchmarkClient implements Runnable {
 			if (_type != TestType.MIXREADWRITE) {
 				_latenciesFile = new BufferedWriter(
 						new FileWriter(new File("results/" + _id + "-" + _type + "_timings.dat")));
-			} else {
+			} else if (_type == TestType.MIXREADWRITE) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/" + _id + "-" + _type + "-"
 						+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
+				_readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
+						"results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() + "-read-write.dat")));
+			} else {
+				LOG.error("Unknown test type");
 			}
 		} catch (IOException e) {
 			LOG.error("Error while creating output file", e);
@@ -165,6 +170,9 @@ public abstract class BenchmarkClient implements Runnable {
 		try {
 			if (_latenciesFile != null)
 				_latenciesFile.close();
+			if (_readWriteDecisionFile != null) {
+				_readWriteDecisionFile.close();
+			}
 		} catch (IOException e) {
 			LOG.warn("Error while closing output file:", e);
 		}

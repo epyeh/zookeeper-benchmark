@@ -148,13 +148,14 @@ public class ZooKeeperBenchmark {
 		// This loop increments i by 5% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
 
-		// for (int i = 0; i <= 100; i += 5) {
+		// for (int i = 0; i <= 4; i += 5) {
 
 		// for (int i = 0; i <= 100; i += 5) {
-		// _numtoRead = i / 5;
-		// _readPercentage = i;
-		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
-		// }
+		for (int i = 0; i <= 100; i += 5) {
+			_numtoRead = i / 5;
+			_readPercentage = i;
+			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+		}
 
 		doTest(TestType.SETSINGLE, "repeated single-znode write");
 

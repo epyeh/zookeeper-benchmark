@@ -54,11 +54,12 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		// and forget about the initial value of _totalOps
 		// The stopping signal is _syncfin
 
-		BufferedWriter readWriteDecisionFile = null;
-		if (type == TestType.MIXREADWRITE) {
-			readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
-					"results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() + "-read-write.dat")));
-		}
+		// BufferedWriter readWriteDecisionFile = null;
+		// if (type == TestType.MIXREADWRITE) {
+		// readWriteDecisionFile = new BufferedWriter(new FileWriter(new File(
+		// "results/" + _id + "-" + _type + this._zkBenchmark.getReadPercentage() +
+		// "-read-write.dat")));
+		// }
 
 		int numToRead = this._zkBenchmark.getNumToRead();
 		int numToWrite = 20 - numToRead;
@@ -134,11 +135,11 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					try {
 
 						if (currRead != 0) {
-							readWriteDecisionFile.write("read\n");
+							_readWriteDecisionFile.write("read\n");
 							_client.getData().forPath(_path + "/read");
 							currRead--;
 						} else {
-							readWriteDecisionFile.write("write\n");
+							_readWriteDecisionFile.write("write\n");
 							data = new String(_zkBenchmark.getData() + i).getBytes();
 							_client.setData().forPath(_path + "/write", data);
 							currWrite--;
@@ -189,13 +190,13 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 			// Finish Timer cancels the timer and then tells the sync client to stop issuing
 			// requests by breaking out
 			if (_syncfin) {
-				try {
-					if (readWriteDecisionFile != null) {
-						readWriteDecisionFile.close();
-					}
-				} catch (IOException e) {
-					LOG.warn("Error while closing readWriteDecision file:", e);
-				}
+				// try {
+				// if (readWriteDecisionFile != null) {
+				// readWriteDecisionFile.close();
+				// }
+				// } catch (IOException e) {
+				// LOG.warn("Error while closing readWriteDecision file:", e);
+				// }
 				break;
 			}
 
