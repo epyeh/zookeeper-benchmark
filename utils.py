@@ -139,9 +139,5 @@ def avg_rate(data, filter=-1):
         total_time += interval
         total_ops += interval * r
         last_timestamp = c
-<<<<<<< HEAD
-        # print(total_time, total_ops)
-=======
         print(total_time, total_ops)
->>>>>>> 1cc056e196a55808000a3bbb60c8d01a1bc27d16
     return total_ops / total_time
