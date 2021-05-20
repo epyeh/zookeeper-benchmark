@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import re
 
-def get_config(path = './benchmark.conf'):
+def get_config(path = '../benchmark.conf'):
     config = {}
     with open(path) as f:
         lines = f.readlines()
@@ -17,49 +17,41 @@ def get_config(path = './benchmark.conf'):
     return config
 
 
-def get_latency_data(op):
-    data = {}
-    files = os.listdir('./')
-    for fn in files:
-        match = re.search('-{}_timings.dat'.format(op), fn)
-        if match:
-            with open(fn) as f:
-                lines = f.readlines()
-                ts = [[float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])] for l in lines]
-                id = int(fn[:match.start()])
-                data[id] = ts
-    return data
-
-'''
-
-path: Path to the latency file or rate file to be read
-
-'''
-def general_read(path):
+def get_data(path):
     with open(path) as f:
         lines = f.readlines()
         ts = [[float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])] for l in lines]
-    return ts
+        return ts
 
-'''
 
-path: Path to the read-write.dat file to be read to determine the percentage of read and write
+def get_files(type, op, prefix='../results/'):
+    files = os.listdir(prefix)
+    pattern = ''
+    if type == 'latency':
+        pattern = '-{}_timings.dat'.format(op)
+    else:
+        pattern = '{}.dat'.format(op)
 
-Return: (read percentage, write percentage)
+    fs = []
+    for fn in files:
+        match = re.search(pattern, fn)
+        if match:
+            fs.append(os.path.join(prefix, fn))
+    return fs
 
-'''
-def get_num_reads(path):
-    with open(path) as f:
-        numReads = 0
-        count = 0
-        lines = f.readlines()
-        for l in lines:
-            l = l.strip()
-            if l == "read":
-                numReads += 1
-            count += 1
-#         readPercent = numReads/count
-    return numReads, count
+    
+# def get_latency_data(op, prefix='../results/'):
+#     data = {}
+#     files = os.listdir(prefix)
+#     for fn in files:
+#         match = re.search('-{}_timings.dat'.format(op), fn)
+#         if match:
+#             with open(fn) as f:
+#                 lines = f.readlines()
+#                 ts = [[float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])] for l in lines]
+#                 id = int(fn[:match.start()])
+#                 data[id] = ts
+#     return data
 
 
 def avg_latency_per_client(data, filter=False):
@@ -86,20 +78,18 @@ def avg_latency(data):
     return avg / cnt
 
 
-def get_rate_data(op):
-    ts = None
-    files = os.listdir('./')
-    for fn in files:
-        match = re.search('{}.dat'.format(op), fn)
-        if match:
-            with open(fn) as f:
-                lines = f.readlines()
-                ts = [(float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])) for l in lines] # (current time, rate)
-                print(ts)
-    return ts
+# def get_rate_data(op):
+#     ts = None
+#     files = os.listdir('./')
+#     for fn in files:
+#         match = re.search('{}.dat'.format(op), fn)
+#         if match:
+#             with open(fn) as f:
+#                 lines = f.readlines()
+#                 ts = [(float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])) for l in lines] # (current time, rate)
+#     return ts
 
 
-<<<<<<< HEAD
 def get_mixrw_rate(prefix, step):
     data = {}
     print("files:")
@@ -114,8 +104,6 @@ def get_mixrw_rate(prefix, step):
     return data
 
 
-=======
->>>>>>> 1cc056e196a55808000a3bbb60c8d01a1bc27d16
 def avg_rate(data, filter=-1):
     # filter < 0, no filter at all
     # ToDo, filter = 0, 3 sigma filtering
@@ -139,5 +127,5 @@ def avg_rate(data, filter=-1):
         total_time += interval
         total_ops += interval * r
         last_timestamp = c
-        print(total_time, total_ops)
+        # print(total_time, total_ops)
     return total_ops / total_time
