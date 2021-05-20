@@ -8,10 +8,13 @@ target/
 *.ear
 
 # python side effects
+/analysis/__pycache__
 **/*.pyc
 
-# ignore data
+# local results
 /results
+*.dat
 
-# ignore local log
+# local log
 zk-benchmark.log
+
