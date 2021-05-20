@@ -127,37 +127,5 @@ def avg_rate(data, filter=-1):
         total_time += interval
         total_ops += interval * r
         last_timestamp = c
-        print(total_time, total_ops)
+        # print(total_time, total_ops)
     return total_ops / total_time
-
-
-'''
-
-path: Path to the latency file or rate file to be read
-
-'''
-def general_read(path):
-    with open(path) as f:
-        lines = f.readlines()
-        ts = [[float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])] for l in lines]
-    return ts
-
-'''
-
-path: Path to the read-write.dat file to be read to determine the percentage of read and write
-
-Return: (read percentage, write percentage)
-
-'''
-def get_num_reads(path):
-    with open(path) as f:
-        numReads = 0
-        count = 0
-        lines = f.readlines()
-        for l in lines:
-            l = l.strip()
-            if l == "read":
-                numReads += 1
-            count += 1
-#         readPercent = numReads/count
-    return numReads, count
