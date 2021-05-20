@@ -143,7 +143,7 @@ public class ZooKeeperBenchmark {
 
 		doTest(TestType.READ, "warm-up");
 
-		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
+		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
 		// This loop increments i by 10% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
@@ -152,11 +152,11 @@ public class ZooKeeperBenchmark {
 			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		}
 
-		doTest(TestType.SETSINGLE, "repeated single-znode write");
+		// doTest(TestType.SETSINGLE, "repeated single-znode write");
 
-		doTest(TestType.CREATE, "znode create");
+		// doTest(TestType.CREATE, "znode create");
 
-		doTest(TestType.SETMULTI, "different znode write");
+		// doTest(TestType.SETMULTI, "different znode write");
 
 		/*
 		 * In the test, node creation and deletion tests are done by creating a lot of
