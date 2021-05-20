@@ -3,6 +3,20 @@ import matplotlib.pyplot as plt
 import os
 import re
 
+def get_config(path = './benchmark.conf'):
+    config = {}
+    with open(path) as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            if len(line) == 0 or line[0] == '#':
+                continue
+            print(line.strip().split('='))
+            k, v = line.strip().split('=')
+            config[k] = v
+    return config
+
+
 def get_latency_data(op):
     data = {}
     files = os.listdir('./')
@@ -48,11 +62,17 @@ def get_num_reads(path):
     return numReads, count
 
 
-def avg_latency_per_client(data):
+def avg_latency_per_client(data, filter=False):
     avg = {}
     for k, v in data.items():
         a = np.array(v)
         d = a[:, 1] - a[:, 0]
+        if filter:
+            mean = np.mean(d)
+            std = np.std(d)
+            mask = np.logical_and(d > mean-3*std, d < mean+3*std)
+            # print(mask)
+            d = d[mask]
         avg[k] = np.mean(d)
     return avg
 
@@ -79,6 +99,7 @@ def get_rate_data(op):
     return ts
 
 
+<<<<<<< HEAD
 def get_mixrw_rate(prefix, step):
     data = {}
     print("files:")
@@ -93,6 +114,8 @@ def get_mixrw_rate(prefix, step):
     return data
 
 
+=======
+>>>>>>> 1cc056e196a55808000a3bbb60c8d01a1bc27d16
 def avg_rate(data, filter=-1):
     # filter < 0, no filter at all
     # ToDo, filter = 0, 3 sigma filtering
@@ -116,5 +139,9 @@ def avg_rate(data, filter=-1):
         total_time += interval
         total_ops += interval * r
         last_timestamp = c
+<<<<<<< HEAD
         # print(total_time, total_ops)
+=======
+        print(total_time, total_ops)
+>>>>>>> 1cc056e196a55808000a3bbb60c8d01a1bc27d16
     return total_ops / total_time
