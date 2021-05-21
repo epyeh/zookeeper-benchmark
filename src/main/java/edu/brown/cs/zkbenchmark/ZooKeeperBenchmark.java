@@ -1,8 +1,8 @@
 package edu.brown.cs.zkbenchmark;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -122,6 +122,8 @@ public class ZooKeeperBenchmark {
 			}
 		}
 
+		_readPercentage = 0.0;
+
 	}
 
 	// Executes the benchmark
@@ -227,7 +229,7 @@ public class ZooKeeperBenchmark {
 		// These are just timestamps. This is not the actual timer
 		_startCpuTime = System.nanoTime();
 		_lastCpuTime = _startCpuTime;
-
+		
 		// Start the testing clients!
 
 		for (int i = 0; i < _clients.length; i++) {
@@ -344,7 +346,7 @@ public class ZooKeeperBenchmark {
 	}
 
 	double getReadPercentage() {
-		return this._readPercentage;
+		return _readPercentage;
 	}
 
 	long getStartTime() {

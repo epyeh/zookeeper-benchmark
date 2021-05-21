@@ -1,8 +1,8 @@
 package edu.brown.cs.zkbenchmark;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -51,15 +51,14 @@ public abstract class BenchmarkClient implements Runnable {
 	public BenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
 			throws IOException {
 		_zkBenchmark = zkBenchmark; // The calling ZooKeeperBenchmark obj
-		_host = host; // The specific client this server will connect to
+		_host = host; 				// The specific client this server will connect to
 		// Generate the curator object.
 		// name space....?
 		_client = CuratorFrameworkFactory.builder().connectString(_host).namespace(namespace)
 				.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000).build();
 		_type = TestType.UNDEFINED;
-		_attempts = attempts; // This is avgOps. The average # of operations to send to the server
-		_id = id; // This clients index. Essentially, what server does this client connect to and
-					// handle?
+		_attempts = attempts; 	// This is avgOps. The average # of operations to send to the server
+		_id = id; 				// This clients index. Essentially, what server does this client connect to and handle?
 		_path = "/client" + id;
 		// _path = "/client-contention";
 		_timer = new Timer();
@@ -95,7 +94,6 @@ public abstract class BenchmarkClient implements Runnable {
 		_countTime = 0;
 
 		// Create a directory to work in
-
 		try {
 			// Check if path exits.
 			// Each client thread will have their own node that they write to avoid conflict
@@ -108,7 +106,6 @@ public abstract class BenchmarkClient implements Runnable {
 			if (stat == null) {
 				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
 			}
-
 		} catch (Exception e) {
 			LOG.error("Error while creating working directory", e);
 		}
@@ -123,14 +120,13 @@ public abstract class BenchmarkClient implements Runnable {
 
 		// Create a new output file for this particular client
 		try {
-
 			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
-					|| _type == TestType.CREATE || _type == TestType.DELETE) {
-				_latenciesFile = new BufferedWriter(
-						new FileWriter(new File("results/last/" + _id + "-" + _type + "_timings.dat")));
+				|| _type == TestType.CREATE || _type == TestType.DELETE) {
+				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
+																			+ "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
-				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type + "-"
-						+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
+				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
+																			+ "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}
@@ -139,7 +135,6 @@ public abstract class BenchmarkClient implements Runnable {
 		}
 
 		// Submit the requests!
-
 		submit(_attempts, _type); // Abstract
 
 		// Test is complete. Print some stats and go home.
@@ -155,7 +150,6 @@ public abstract class BenchmarkClient implements Runnable {
 		} catch (IOException e) {
 			LOG.warn("Error while closing output file:", e);
 		}
-
 		LOG.info("Client #" + _id + " -- Current test complete. " + "Completed " + _count + " operations.");
 
 		// Notify ZooKeeperBenchmark object that this thread is done computing
@@ -215,7 +209,7 @@ public abstract class BenchmarkClient implements Runnable {
 
 	void recordEvent(CuratorEvent event) {
 		ZooKeeperContext ctx = (ZooKeeperContext) event.getContext();
-		if (ctx.type != _type) {
+		if (ctx.type != _type || ctx.ratio != _zkBenchmark.getReadPercentage()) {
 			System.out.println("** Error, should not happen");
 		}
 		recordElapsedInterval(ctx.time);
