@@ -124,7 +124,7 @@ public abstract class BenchmarkClient implements Runnable {
 		try {
 
 			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
-					|| _type == TestType.CREATE || _type == TestType.DELETE) {
+					|| _type == TestType.CREATE || _type == TestType.DELETE || _type == TestType.WRITESYNCREAD) {
 				_latenciesFile = new BufferedWriter(
 						new FileWriter(new File("results/" + _id + "-" + _type + "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
@@ -141,6 +141,7 @@ public abstract class BenchmarkClient implements Runnable {
 
 		submit(_attempts, _type); // Abstract
 
+
 		// Test is complete. Print some stats and go home.
 		// Zookeeper server keeps track of some stats. This zkAdminCommand
 		// Tells zookeeper to execute the "stat" command and give the stats back to this
@@ -149,8 +150,10 @@ public abstract class BenchmarkClient implements Runnable {
 
 		// Clean up by closing files and logging completion time
 		try {
-			if (_latenciesFile != null)
+			if (_latenciesFile != null){
 				_latenciesFile.close();
+			}
+				
 		} catch (IOException e) {
 			LOG.warn("Error while closing output file:", e);
 		}

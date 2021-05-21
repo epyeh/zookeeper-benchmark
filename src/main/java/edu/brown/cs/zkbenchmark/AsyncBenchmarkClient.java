@@ -120,6 +120,24 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 					}
 					break;
 
+				case WRITESYNCREAD:
+
+					// Write
+					double writeTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
+					data = new String(_zkBenchmark.getData() + i).getBytes();
+					_client.setData().inBackground(new Double(writeTime)).forPath(_path, data);
+
+					// Sync
+					double syncTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
+					_client.sync(_path, new Double(syncTime)); 	// Note: sync occurs in the background. new Double(syncTime) 
+																// is the context for the background sync operation
+																// see: https://curator.apache.org/apidocs/org/apache/curator/framework/CuratorFramework.html#sync()
+
+					// Read
+					double readTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
+					_client.getData().inBackground(new Double(readTime)).forPath(_path);
+					break;
+
 				case UNDEFINED:
 					LOG.error("Test type was UNDEFINED. No tests executed");
 					break;
@@ -128,7 +146,6 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 			}
 			_count++;
 		}
-
 	}
 
 	@Override

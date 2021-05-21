@@ -50,7 +50,7 @@ public class ZooKeeperBenchmark {
 	private double _readPercentage;
 
 	enum TestType {
-		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE
+		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE, WRITESYNCREAD
 	}
 
 	private static final Logger LOG = Logger.getLogger(ZooKeeperBenchmark.class);
@@ -143,7 +143,7 @@ public class ZooKeeperBenchmark {
 
 		doTest(TestType.READ, "warm-up");
 
-		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
+		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
 		// This loop increments i by 10% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
@@ -152,7 +152,9 @@ public class ZooKeeperBenchmark {
 			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		}
 
-		// doTest(TestType.SETSINGLE, "repeated single-znode write");
+		doTest(TestType.WRITESYNCREAD, "repeated write sync read");
+
+		doTest(TestType.SETSINGLE, "repeated single-znode write");
 
 		// doTest(TestType.CREATE, "znode create");
 
@@ -167,7 +169,7 @@ public class ZooKeeperBenchmark {
 		 * requests are sent and processed by zookeeper server anyway, this could still
 		 * be an issue.
 		 */
-		doTest(TestType.DELETE, "znode delete");
+		// doTest(TestType.DELETE, "znode delete");
 
 		LOG.info("Tests completed, now cleaning-up");
 
@@ -209,7 +211,7 @@ public class ZooKeeperBenchmark {
 		// Instantiate rate output file. This will be where the results go
 		try {
 			if (_currentTest == TestType.READ || _currentTest == TestType.SETSINGLE || _currentTest == TestType.SETMULTI
-					|| _currentTest == TestType.CREATE || _currentTest == TestType.DELETE) {
+					|| _currentTest == TestType.CREATE || _currentTest == TestType.DELETE || _currentTest == TestType.WRITESYNCREAD) {
 				_rateFile = new BufferedWriter(new FileWriter(new File("results/" + test + ".dat")));
 			} else if (_currentTest == TestType.MIXREADWRITE) {
 				_rateFile = new BufferedWriter(

@@ -40,7 +40,6 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		_syncfin = false;
 		_totalOps = _zkBenchmark.getCurrentTotalOps();
 		LOG.info("* Initial totalOps = " + _totalOps.get());
-		// System.out.println("* Initial totalOps = " + _totalOps.get());
 		byte data[];
 
 		// Eric: Why do they use _totalOps.get(). Why not just use n? What's the point
