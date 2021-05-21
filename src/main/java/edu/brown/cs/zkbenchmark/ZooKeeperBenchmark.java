@@ -128,10 +128,12 @@ public class ZooKeeperBenchmark {
 	public void runBenchmark() {
 
 		// Create results directory if it doesn't exist
-		File directory = new File("./results");
+		File directory = new File("./results/last/");
 		if (!directory.exists()) {
 			directory.mkdir();
 		}
+
+		System.out.println("-- " + _totalOps + " outstanding requests");
 
 		/*
 		 * Read requests are done by zookeeper extremely quickly compared with write
@@ -167,7 +169,7 @@ public class ZooKeeperBenchmark {
 		 * requests are sent and processed by zookeeper server anyway, this could still
 		 * be an issue.
 		 */
-		doTest(TestType.DELETE, "znode delete");
+		// doTest(TestType.DELETE, "znode delete");
 
 		LOG.info("Tests completed, now cleaning-up");
 
@@ -200,20 +202,20 @@ public class ZooKeeperBenchmark {
 		_currentTotalOps = new AtomicInteger(_totalOps);
 		_finished = false;
 
-		System.out.print("Running " + description + " benchmark for " + _totalTimeSeconds + " seconds... ");
+		System.out.print("-- running " + description + " benchmark for " + _totalTimeSeconds + " seconds... ");
 
 		if (_currentTest == TestType.MIXREADWRITE) {
-			System.out.print(" and a readPercentage of:" + _readPercentage + "% ");
+			System.out.print("and a read percentage of: " + _readPercentage * 100 + "% ");
 		}
 
 		// Instantiate rate output file. This will be where the results go
 		try {
 			if (_currentTest == TestType.READ || _currentTest == TestType.SETSINGLE || _currentTest == TestType.SETMULTI
 					|| _currentTest == TestType.CREATE || _currentTest == TestType.DELETE) {
-				_rateFile = new BufferedWriter(new FileWriter(new File("results/" + test + ".dat")));
+				_rateFile = new BufferedWriter(new FileWriter(new File("results/last/" + test + ".dat")));
 			} else if (_currentTest == TestType.MIXREADWRITE) {
 				_rateFile = new BufferedWriter(
-						new FileWriter(new File("results/" + test + "-" + _readPercentage + ".dat")));
+						new FileWriter(new File("results/last/" + test + "-" + _readPercentage + ".dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}
@@ -433,7 +435,7 @@ public class ZooKeeperBenchmark {
 		Appender a = Logger.getRootLogger().getAppender("file");
 		if (a != null && a instanceof FileAppender) {
 			FileAppender fa = (FileAppender) a;
-			System.out.println("Detailed logs going to: " + fa.getFile());
+			System.out.println("-- detailed logs going to: " + fa.getFile());
 		}
 
 		// Run the benchmark

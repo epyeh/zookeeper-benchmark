@@ -61,6 +61,7 @@ public abstract class BenchmarkClient implements Runnable {
 		_id = id; // This clients index. Essentially, what server does this client connect to and
 					// handle?
 		_path = "/client" + id;
+		// _path = "/client-contention";
 		_timer = new Timer();
 		_highestN = 0;
 		_highestDeleted = 0;
@@ -126,9 +127,9 @@ public abstract class BenchmarkClient implements Runnable {
 			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
 					|| _type == TestType.CREATE || _type == TestType.DELETE) {
 				_latenciesFile = new BufferedWriter(
-						new FileWriter(new File("results/" + _id + "-" + _type + "_timings.dat")));
+						new FileWriter(new File("results/last/" + _id + "-" + _type + "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
-				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/" + _id + "-" + _type + "-"
+				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type + "-"
 						+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
 			} else {
 				LOG.error("Unknown test type");
@@ -213,8 +214,11 @@ public abstract class BenchmarkClient implements Runnable {
 	}
 
 	void recordEvent(CuratorEvent event) {
-		Double submitTime = (Double) event.getContext();
-		recordElapsedInterval(submitTime);
+		ZooKeeperContext ctx = (ZooKeeperContext) event.getContext();
+		if (ctx.type != _type) {
+			System.out.println("** Error, should not happen");
+		}
+		recordElapsedInterval(ctx.time);
 	}
 
 	// startTime here represents the time when ONE request was sent

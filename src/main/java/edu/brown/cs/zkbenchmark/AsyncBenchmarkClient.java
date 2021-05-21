@@ -16,8 +16,8 @@ import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
 public class AsyncBenchmarkClient extends BenchmarkClient {
 
-	private class Monitor {
-	}
+	private class Monitor {}
+
 
 	TestType _currentType = TestType.UNDEFINED;
 	private Monitor _monitor = new Monitor();
@@ -74,37 +74,37 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 
 			switch (type) {
 				case READ:
-					_client.getData().inBackground(new Double(time)).forPath(_path);
+					_client.getData().inBackground(new ZooKeeperContext(time, TestType.READ)).forPath(_path);
 					break;
 
-				case SETSINGLE:
-					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.setData().inBackground(new Double(time)).forPath(_path, data);
-					break;
+				// case SETSINGLE:
+				// 	data = new String(_zkBenchmark.getData() + i).getBytes();
+				// 	_client.setData().inBackground(new Double(time)).forPath(_path, data);
+				// 	break;
 
-				case SETMULTI:
-					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.setData().inBackground(new Double(time)).forPath(_path + "/" + (_count % _highestN), data);
-					break;
+				// case SETMULTI:
+				// 	data = new String(_zkBenchmark.getData() + i).getBytes();
+				// 	_client.setData().inBackground(new Double(time)).forPath(_path + "/" + (_count % _highestN), data);
+				// 	break;
 
-				case CREATE:
-					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.create().inBackground(new Double(time)).forPath(_path + "/" + _count, data);
-					_highestN++;
-					break;
+				// case CREATE:
+				// 	data = new String(_zkBenchmark.getData() + i).getBytes();
+				// 	_client.create().inBackground(new Double(time)).forPath(_path + "/" + _count, data);
+				// 	_highestN++;
+				// 	break;
 
-				case DELETE:
-					_client.delete().inBackground(new Double(time)).forPath(_path + "/" + _count);
-					_highestDeleted++;
+				// case DELETE:
+				// 	_client.delete().inBackground(new Double(time)).forPath(_path + "/" + _count);
+				// 	_highestDeleted++;
 
-					if (_highestDeleted >= _highestN) {
-						zkAdminCommand("stat");
-						_zkBenchmark.notifyFinished(_id);
-						_timer.cancel();
-						_count++;
-						return;
-					}
-					break;
+				// 	if (_highestDeleted >= _highestN) {
+				// 		zkAdminCommand("stat");
+				// 		_zkBenchmark.notifyFinished(_id);
+				// 		_timer.cancel();
+				// 		_count++;
+				// 		return;
+				// 	}
+				// 	break;
 
 				// Case for trying to do mixed reads and writes to nodes
 				case MIXREADWRITE:
@@ -113,10 +113,10 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 					double readThreshold = this._zkBenchmark.getReadPercentage();
 
 					if (randDouble < readThreshold) {
-						_client.getData().inBackground(new Double(time)).forPath(_path);
+						_client.getData().inBackground(new ZooKeeperContext(time, TestType.MIXREADWRITE)).forPath(_path);
 					} else {
 						data = new String(_zkBenchmark.getData() + i).getBytes();
-						_client.setData().inBackground(new Double(time)).forPath(_path, data);
+						_client.setData().inBackground(new ZooKeeperContext(time, TestType.MIXREADWRITE)).forPath(_path, data);
 					}
 					break;
 
@@ -124,7 +124,7 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 					LOG.error("Test type was UNDEFINED. No tests executed");
 					break;
 				default:
-					LOG.error("Unknown Test Type.");
+					LOG.error("Unknown Test Type");
 			}
 			_count++;
 		}
