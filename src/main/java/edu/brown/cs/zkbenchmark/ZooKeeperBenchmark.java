@@ -48,6 +48,7 @@ public class ZooKeeperBenchmark {
 	private CyclicBarrier _barrier;
 	private Boolean _finished;
 	private double _readPercentage;
+	private static int cToS;	// represents the number of clients to servers. 2 means 2 clients for 1 server
 
 	enum TestType {
 		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE, WRITESYNCREAD
@@ -82,12 +83,14 @@ public class ZooKeeperBenchmark {
 		int totaltime = conf.getInt("totalTime"); // total time is the time for each test
 		_totalTimeSeconds = Math.round((double) totaltime / 1000.0);
 		boolean sync = conf.getBoolean("sync");
+		cToS = conf.getInt("clientsToServer");
 
 		_running = new HashMap<Integer, Thread>(); // Hashmap of currently running threads
-		_clients = new BenchmarkClient[serverList.size()]; // Array of clients that connect to zookeeper servers. 1
+		// _clients = new BenchmarkClient[serverList.size()]; // Array of clients that connect to zookeeper servers. 1
 															// client per server
 															// ERIC: Why do they only have 1 client per server? Does
 															// this make sense?
+		_clients = new BenchmarkClient[cToS * serverList.size()];
 		_barrier = new CyclicBarrier(_clients.length + 1); // THIS IS NECESSARY TO SYNCHRONIZE ALL CLIENTS and the
 															// 'main' doTest function in this class.
 															// Only once _clients.length + 1 calls to _barrier.await()
@@ -110,15 +113,26 @@ public class ZooKeeperBenchmark {
 
 		// Calculate the average # of operations that need to be sent to each zookeeper
 		// server
-		int avgOps = _totalOps / serverList.size();
+		int avgOps = _totalOps / (cToS * serverList.size());
 
 		// Instantiate 1 client for each server
-		for (int i = 0; i < serverList.size(); i++) {
+		// for (int i = 0; i < serverList.size(); i++) {
+		// 	if (sync) {
+		// 		// This is synchronous
+		// 		_clients[i] = new SyncBenchmarkClient(this, serverList.get(i), "/zkTest", avgOps, i);
+		// 	} else {
+		// 		_clients[i] = new AsyncBenchmarkClient(this, serverList.get(i), "/zkTest", avgOps, i);
+		// 	}
+		// }
+
+		// Instantiate 1 client for each server
+		for (int i = 0; i < cToS * serverList.size(); i++) {
+			int idx = i % serverList.size();
 			if (sync) {
 				// This is synchronous
-				_clients[i] = new SyncBenchmarkClient(this, serverList.get(i), "/zkTest", avgOps, i);
+				_clients[i] = new SyncBenchmarkClient(this, serverList.get(idx), "zkTest", avgOps, i);
 			} else {
-				_clients[i] = new AsyncBenchmarkClient(this, serverList.get(i), "/zkTest", avgOps, i);
+				_clients[i] = new AsyncBenchmarkClient(this, serverList.get(idx), "zkTest", avgOps, i);
 			}
 		}
 
@@ -379,6 +393,7 @@ public class ZooKeeperBenchmark {
 		parser.accepts("lbound", "lowerbound for the number of operations").withRequiredArg().ofType(Integer.class);
 		parser.accepts("time", "time tests will run for (milliseconds)").withRequiredArg().ofType(Integer.class);
 		parser.accepts("sync", "sync or async test").withRequiredArg().ofType(Boolean.class);
+		parser.accepts("clientsToServer", "Number of clients to server").withRequiredArg().ofType(Integer.class);
 
 		// Parse and gather the arguments
 		try {

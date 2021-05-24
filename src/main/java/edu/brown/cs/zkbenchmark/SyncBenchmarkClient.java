@@ -1,15 +1,33 @@
 package edu.brown.cs.zkbenchmark;
 
+import java.lang.Throwable;
+import java.time.Duration;
 import java.io.File;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.Random;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.data.Stat;
+
+// import com.netflix.curator.framework.CuratorFramework;
+// import com.netflix.curator.framework.api.CuratorEventType;
+// import com.netflix.curator.framework.api.CuratorEvent;
+// import com.netflix.curator.framework.api.BackgroundCallback;
+
+// import org.apache.curator.framework.api.SyncBuilder;
+// import org.apache.curator.framework.imps.SyncBuilderImpl;
+import org.apache.curator.framework.api.CuratorEventType;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.framework.api.BackgroundCallback;
+// import org.apache.curator.framework.api.Backgroundable;
+// import org.apache.curator.framework.api.BackgroundPathable;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -19,6 +37,8 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 	private boolean _syncfin;
 
 	private static final Logger LOG = Logger.getLogger(SyncBenchmarkClient.class);
+
+	private static final int TIMEOUT_DURATION = 5;	// Represents the timeout duration for a synchronous sync call to return. Units is seconds
 
 	public SyncBenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
 			throws IOException {
@@ -111,6 +131,39 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					}
 					break;
 
+								// Case for trying to do mixed reads and writes to nodes
+				case MIXREADWRITE:
+
+					double randDouble = Math.random();
+					double readThreshold = this._zkBenchmark.getReadPercentage();
+
+					if (randDouble < readThreshold) {
+						_client.getData().forPath(_path);
+					} else {
+						data = new String(_zkBenchmark.getData() + i).getBytes();
+						_client.setData().forPath(_path, data);
+					}
+					break;
+
+				case WRITESYNCREAD:
+
+					// Synchrnous Write
+					data = new String(_zkBenchmark.getData() + i).getBytes();
+					_client.setData().forPath(_path, data);
+					_zkBenchmark.incrementFinished();
+
+					// Synchronous Sync
+					boolean res = this.synchronousSync(Duration.ofSeconds(TIMEOUT_DURATION));	// 5 seconds for sync to return or we get false
+					
+					if(!res){
+						System.out.println("Sync did not return within " + TIMEOUT_DURATION + " seconds. This should not happen!!");
+						LOG.error("Sync did not return within " + TIMEOUT_DURATION + " seconds. This should not happen.");
+					}
+
+					// Synchronous Read
+					_client.getData().forPath(_path);
+					break;
+
 				case UNDEFINED:
 					LOG.error("Test type was UNDEFINED. No tests executed");
 					break;
@@ -148,5 +201,41 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 	@Override
 	protected void resubmit(int n) {
 		_totalOps.getAndAdd(n);
+	}
+
+	
+
+	/**
+ 	* Performs a blocking sync operation.  Returns true if the sync completed normally, false if it timed out or
+   	* was interrupted.
+   	*/
+	public boolean synchronousSync(Duration timeout) {
+		CuratorFramework curator = _client; 
+		try {
+		// Curator sync() is always a background operation.  Use a latch to block until it finishes.
+		final CountDownLatch latch = new CountDownLatch(1);
+		curator.sync().inBackground(new BackgroundCallback() {
+			@Override
+			public void processResult(CuratorFramework curator, CuratorEvent event) throws Exception {
+				if (event.getType() == CuratorEventType.SYNC) {
+					latch.countDown();
+				}
+			}
+		}).forPath(_path);
+
+		// Wait for sync to complete.
+		return latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			System.out.println("Error: " + e);
+			LOG.info("exception " + e);
+			e.printStackTrace();
+			return false;
+		} catch (Exception e) {
+			System.out.println("Error: " + e);
+			LOG.info("exception " + e);
+			e.printStackTrace();
+			return false;
+			// throw Throwables.propagate(e);
+		}
 	}
 }

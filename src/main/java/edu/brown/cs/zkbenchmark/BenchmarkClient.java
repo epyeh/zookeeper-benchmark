@@ -18,10 +18,16 @@ import org.apache.log4j.Logger;
 
 // Curator is a more specialized client. Essentially curator takes care of managing connection (from client side) to zookeeper server
 // It handles retries and other edge cases. Look up curator zookeeper for full doc
-import com.netflix.curator.framework.CuratorFramework;
-import com.netflix.curator.framework.CuratorFrameworkFactory;
-import com.netflix.curator.framework.api.CuratorEvent;
-import com.netflix.curator.retry.RetryNTimes;
+// import com.netflix.curator.framework.CuratorFramework;
+// import com.netflix.curator.framework.CuratorFrameworkFactory;
+// import com.netflix.curator.framework.api.CuratorEvent;
+// import com.netflix.curator.retry.RetryNTimes;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.retry.RetryNTimes;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.SyncBuilder;
+import org.apache.curator.framework.api.Backgroundable;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -55,7 +61,8 @@ public abstract class BenchmarkClient implements Runnable {
 		// Generate the curator object.
 		// name space....?
 		_client = CuratorFrameworkFactory.builder().connectString(_host).namespace(namespace)
-				.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000).build();
+					.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000).build();
+		
 		_type = TestType.UNDEFINED;
 		_attempts = attempts; // This is avgOps. The average # of operations to send to the server
 		_id = id; // This clients index. Essentially, what server does this client connect to and

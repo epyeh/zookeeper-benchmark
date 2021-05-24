@@ -9,8 +9,11 @@ import java.io.IOException;
 
 import org.apache.log4j.Logger;
 
-import com.netflix.curator.framework.api.CuratorListener;
-import com.netflix.curator.framework.listen.ListenerContainer;
+// import com.netflix.curator.framework.api.CuratorListener;
+// import com.netflix.curator.framework.listen.ListenerContainer;
+
+import org.apache.curator.framework.api.CuratorListener;
+import org.apache.curator.framework.listen.Listenable;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -32,7 +35,7 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 
 	@Override
 	protected void submit(int n, TestType type) {
-		ListenerContainer<CuratorListener> listeners = (ListenerContainer<CuratorListener>) _client
+		Listenable<CuratorListener> listeners = (Listenable<CuratorListener>) _client
 				.getCuratorListenable();
 		BenchmarkListener listener = new BenchmarkListener(this);
 		listeners.addListener(listener);

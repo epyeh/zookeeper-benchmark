@@ -1,9 +1,13 @@
 package edu.brown.cs.zkbenchmark;
 
-import com.netflix.curator.framework.CuratorFramework;
-import com.netflix.curator.framework.api.CuratorEvent;
-import com.netflix.curator.framework.api.CuratorEventType;
-import com.netflix.curator.framework.api.CuratorListener;
+// import com.netflix.curator.framework.CuratorFramework;
+// import com.netflix.curator.framework.api.CuratorEvent;
+// import com.netflix.curator.framework.api.CuratorEventType;
+// import com.netflix.curator.framework.api.CuratorListener;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.framework.api.CuratorEventType;
+import org.apache.curator.framework.api.CuratorListener;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
