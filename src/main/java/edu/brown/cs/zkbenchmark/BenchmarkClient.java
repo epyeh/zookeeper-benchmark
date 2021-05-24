@@ -26,13 +26,12 @@ import com.netflix.curator.retry.RetryNTimes;
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
 // Client code to connect to zookeeper.
-// implements Runnable because we are going to multithread the 
-// execution of client operations to zookeeper
+// Implements Runnable because we are going to multithread the execution of client operations to zookeeper
 public abstract class BenchmarkClient implements Runnable {
 	protected ZooKeeperBenchmark _zkBenchmark;
-	protected String _host; // the host this client is connecting to
+	protected String _host; 			// the host this client is connecting to
 	protected CuratorFramework _client; // the actual client
-	protected TestType _type; // current test
+	protected TestType _type; 			// current test
 	protected int _attempts;
 	protected String _path;
 	protected int _id;
@@ -52,13 +51,12 @@ public abstract class BenchmarkClient implements Runnable {
 			throws IOException {
 		_zkBenchmark = zkBenchmark; // The calling ZooKeeperBenchmark obj
 		_host = host; 				// The specific client this server will connect to
-		// Generate the curator object.
-		// name space....?
+
 		_client = CuratorFrameworkFactory.builder().connectString(_host).namespace(namespace)
 				.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000).build();
 		_type = TestType.UNDEFINED;
 		_attempts = attempts; 	// This is avgOps. The average # of operations to send to the server
-		_id = id; 				// This clients index. Essentially, what server does this client connect to and handle?
+		_id = id; 				// This clients index. Essentially, what server does this client connect to
 		_path = "/client" + id;
 		// _path = "/client-contention";
 		_timer = new Timer();
@@ -97,11 +95,7 @@ public abstract class BenchmarkClient implements Runnable {
 		try {
 			// Check if path exits.
 			// Each client thread will have their own node that they write to avoid conflict
-			// Eric: Is this a really useful usecase? This completely avoids the issue of
-			// zookeeper.
-			// like the whole point is to be synchronizing. what's the point if nobody ever
-			// reads what you write
-			// Can we potentially do something where we introduce a BIT of contention?
+			// Eric: Can we potentially do something where we introduce a BIT of contention?
 			Stat stat = _client.checkExists().forPath(_path);
 			if (stat == null) {
 				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
@@ -110,18 +104,16 @@ public abstract class BenchmarkClient implements Runnable {
 			LOG.error("Error while creating working directory", e);
 		}
 
-		// Create a timer to check when we're finished. Schedule it to run
-		// periodically in case we want to record periodic statistics
+		// Create a timer to check when we're finished. 
+		// Schedule it to run periodically in case we want to record periodic statistics
 		int interval = _zkBenchmark.getInterval();
 
-		// After _interval milliseconds have passed, execute the function
-		// FinishTimer()
+		// After _interval milliseconds have passed, execute the function FinishTimer()
 		_timer.scheduleAtFixedRate(new FinishTimer(), interval, interval);
 
 		// Create a new output file for this particular client
 		try {
-			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
-				|| _type == TestType.CREATE || _type == TestType.DELETE) {
+			if (_type == TestType.READ || _type == TestType.CREATE || _type == TestType.DELETE) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
 																			+ "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
@@ -135,6 +127,7 @@ public abstract class BenchmarkClient implements Runnable {
 		}
 
 		// Submit the requests!
+		// Blocking
 		submit(_attempts, _type); // Abstract
 
 		// Test is complete. Print some stats and go home.
@@ -156,30 +149,22 @@ public abstract class BenchmarkClient implements Runnable {
 		_zkBenchmark.notifyFinished(_id);
 	}
 
-	// TimerTask is a class that is used with Timer. Allows for repeated
-	// execution by a Timer on a fixed interval
-	// Just increment _countTime every _interval milliseconds
-	// Recall, _deadline is computed as: totaltime / _interval
+	// TimerTask is a class that is used with Timer. 
+	// Allows for repeated execution by a Timer on a fixed interval.
+	// Just increment _countTime every _interval milliseconds.
+	// Recall, _deadline is computed as: totaltime / _interval.
 	// So if totaltime = 30000 and _interval = 200
 	// Then 30000/200 = 150.
-	// 150 represents the total number of times the clock needs to tick (with an
-	// interval of _interval)
+	// 150 represents the total number of times the clock needs to tick (with an interval of _interval)
 	// So each time _interval milliseconds pass, we tick countTime by 1.
-	//
-	// Note, they could just have easily kept a timer where it keeps track of the
-	// aggregate milliseconds that passed
-	// ie time+=_interval. When time == totalTime -> exit out
 	class FinishTimer extends TimerTask {
 		@Override
 		public void run() {
-			// this can be used to measure rate of each thread
-			// at this moment, it is not necessary
 			_countTime++;
 
 			if (_countTime == _zkBenchmark.getDeadline()) {
-				this.cancel(); // Cancel the current TimerTask and then call finish()
-				finish(); // Abstract. Kill the sync or async client. ie tell them to stop issuing
-							// requests
+				this.cancel(); 	// Cancel the current TimerTask and then call finish()
+				finish(); 		// Abstract. Kill the sync or async client. Tell them to stop issuing requests
 			}
 		}
 	}

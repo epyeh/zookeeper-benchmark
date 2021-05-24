@@ -39,20 +39,7 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 	protected void submitWrapped(int n, TestType type) throws Exception {
 		_syncfin = false;
 		_totalOps = _zkBenchmark.getCurrentTotalOps();
-		LOG.info("* Initial totalOps = " + _totalOps.get());
-		// System.out.println("* Initial totalOps = " + _totalOps.get());
 		byte data[];
-
-		// Eric: Why do they use _totalOps.get(). Why not just use n? What's the point
-		// of passing _attempts from BenchmarkClient? Shouldn't it be n?
-		// Every client shouldn't be looping over the total number of operations. it
-		// should be the average # of operations they need to complete
-
-		// I would say this is realy a nasty code.
-		// As far as I can tell,
-		// the _totalOps is the number of outstanding ops
-		// and forget about the initial value of _totalOps
-		// The stopping signal is _syncfin
 
 		for (int i = 0; i < _totalOps.get(); i++) {
 			double submitTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
@@ -61,37 +48,6 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 				// Read 1 znode
 				case READ:
 					_client.getData().forPath(_path);
-					break;
-
-				// Set data for 1 znode
-				case SETSINGLE:
-					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.setData().forPath(_path, data);
-					break;
-
-				// Set data for multiple znodes
-				case SETMULTI:
-					try {
-						data = new String(_zkBenchmark.getData() + i).getBytes();
-
-						// What does _count % _highestN mean?
-						// _count represents the # of operations completed
-						// _highestN represents the # of nodes that were created
-						// They compute _count % _highestN because they want
-						// to cycle through all of the nodes they created
-						// and try setting to them
-						//
-						// example:
-						// client0
-						// znode0, znode1, znode2, znode3, ...
-						// multiset will try to write to znode0, znode1, znode2, znode3 ...
-						// That's what they mean by multiset
-
-						_client.setData().forPath(_path + "/" + (_count % _highestN), data);
-					} catch (NoNodeException e) {
-						LOG.warn("No such node when setting data to mutiple nodes. " + "_path = " + _path
-								+ ", _count = " + _count + ", _highestN = " + _highestN, e);
-					}
 					break;
 
 				// Create new node with path _path and _count
@@ -121,16 +77,15 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 			}
 
 			recordElapsedInterval(new Double(submitTime));
-			_count++; // increment _count to keep track of how many operations completed
-			_zkBenchmark.incrementFinished(); // increment the # of operations that have been completed
+			_count++; 							// increment _count to keep track of how many operations completed
+			_zkBenchmark.incrementFinished(); 	// increment the # of operations that have been completed
 												// This is the aggregate global var across all threads
-												// to keep track of the total # of operations ALL the threads
-												// together have been able to complete
+												// to keep track of the total # of operations 
+												// ALL the threads together have been able to complete
 
 			// _syncfin will be set to true when finish() is called.
 			// This is called in BenchmarkClient under FinishTimer.
-			// Finish Timer cancels the timer and then tells the sync client to stop issuing
-			// requests by breaking out
+			// Finish Timer cancels the timer and then tells the sync client to stop issuing requests by breaking out
 			if (_syncfin) {
 				break;
 			}
