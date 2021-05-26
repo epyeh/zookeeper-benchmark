@@ -42,13 +42,13 @@ public abstract class BenchmarkClient implements Runnable {
 	protected int _countTime;
 	protected Timer _timer;
 	protected List _lock;
+	protected String _lockPath = "/lock";
 
 	protected BufferedWriter _latenciesFile;
 
 	private static final Logger LOG = Logger.getLogger(BenchmarkClient.class);
 
-	public BenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
-			throws IOException {
+	public BenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id) throws IOException {
 		_zkBenchmark = zkBenchmark; // The calling ZooKeeperBenchmark obj
 		_host = host; 				// The specific client this server will connect to
 
@@ -58,7 +58,7 @@ public abstract class BenchmarkClient implements Runnable {
 		_type = TestType.UNDEFINED;
 		_attempts = attempts;
 		_id = id;
-		_path = "/client" + id;
+		// _path = "/client" + id;
 		// _path = "/client-contention";
 		_timer = new Timer();
 		_lock = Collections.synchronizedList(new LinkedList());
@@ -87,24 +87,24 @@ public abstract class BenchmarkClient implements Runnable {
 		_count = 0;
 		_countTime = 0;
 
-		try {
-			Stat stat = _client.checkExists().forPath(_path);
-			if (stat == null) {
-				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
-			}
-		} catch (Exception e) {
-			LOG.error("Error while creating working directory", e);
-		}
+		// try {
+		// 	Stat stat = _client.checkExists().forPath(_path);
+		// 	if (stat == null) {
+		// 		_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
+		// 	}
+		// } catch (Exception e) {
+		// 	LOG.error("Error while creating working directory", e);
+		// }
 
 		int interval = _zkBenchmark.getInterval();
 
 		_timer.scheduleAtFixedRate(new FinishTimer(), interval, interval);
 
 		try {
-			if (_type == TestType.READ || _type == TestType.CREATE || _type == TestType.DELETE) {
+			if (_type == TestType.READ) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
 																			+ "_timings.dat")));
-			} else if (_type == TestType.MIXREADWRITE) {
+			} else if (_type == TestType.MRW) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
 																			+ "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
 			}  else if (_type == TestType.AR) {
@@ -137,8 +137,9 @@ public abstract class BenchmarkClient implements Runnable {
 		@Override
 		public void run() {
 			_countTime++;
-
+			LOG.info("Client #" + _id + " finishes " + _countTime + " intervals");
 			if (_countTime == _zkBenchmark.getDeadline()) {
+				LOG.info("Client #" + _id + " reaches the deadline");
 				this.cancel(); 	// Cancel the current TimerTask and then call finish()
 				finish(); 		// Abstract. Kill the sync or async client. Tell them to stop issuing requests
 			}
