@@ -1,0 +1,46 @@
+package edu.brown.cs.zkbenchmark;
+
+import java.util.List;
+
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.framework.api.CuratorEventType;
+import org.apache.curator.framework.api.CuratorListener;
+
+import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
+
+class BenchmarkListener implements CuratorListener {
+	private BenchmarkClient _client; // client listener listens for
+
+	BenchmarkListener(BenchmarkClient client) {
+		_client = client;
+	}
+
+	@Override
+	public void eventReceived(CuratorFramework client, CuratorEvent event) {
+		CuratorEventType type = event.getType();
+		// Ensure that the event is reply to current test
+		TestType _type = _client.getCurrentTest();
+		System.out.println("-- " + "#" + _client.getID() + " CuratorEventType: " + type + " TestType: " + _type);
+
+		// if ((type == CuratorEventType.GET_DATA && _type == TestType.READ)
+		// 	|| (type == CuratorEventType.DELETE && _type == TestType.DELETE)
+		// 	|| (type == CuratorEventType.CREATE && _type == TestType.CREATE)
+		// 	|| (type == CuratorEventType.GET_DATA && _type == TestType.MIXREADWRITE)
+		// 	|| (type == CuratorEventType.SET_DATA && _type == TestType.MIXREADWRITE)
+		// 	|| (type == CuratorEventType.WATCHED && _type == TestType.ACQUIRE)) {
+
+		// 	if (type == CuratorEventType.WATCHED && _type == TestType.ACQUIRE) {
+		// 		System.out.println("-- To wake up client #" + _client.getID());
+		// 		List _lock = _client.getLock();
+		// 		synchronized (_lock) {
+		// 		_lock.notify();
+		// 		}
+		// 	} else {
+		// 		_client.getBenchmark().incrementFinished();
+		// 		_client.recordEvent(event);
+		// 		_client.resubmit(1);
+		// 	}
+		// }
+	}
+}

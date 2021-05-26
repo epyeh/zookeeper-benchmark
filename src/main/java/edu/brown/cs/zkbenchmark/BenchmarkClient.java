@@ -9,6 +9,8 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.LinkedList;
+import java.util.Collections;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.BrokenBarrierException;
@@ -16,37 +18,35 @@ import java.util.concurrent.BrokenBarrierException;
 import org.apache.zookeeper.data.Stat;
 import org.apache.log4j.Logger;
 
-// Curator is a more specialized client. Essentially curator takes care of managing connection (from client side) to zookeeper server
-// It handles retries and other edge cases. Look up curator zookeeper for full doc
-import com.netflix.curator.framework.CuratorFramework;
-import com.netflix.curator.framework.CuratorFrameworkFactory;
-import com.netflix.curator.framework.api.CuratorEvent;
-import com.netflix.curator.retry.RetryNTimes;
+import org.apache.curator.retry.RetryNTimes;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.x.async.AsyncCuratorFramework;
+import org.apache.curator.x.async.AsyncEventException;
+import org.apache.curator.x.async.WatchMode;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
-// Client code to connect to zookeeper.
-// Implements Runnable because we are going to multithread the execution of client operations to zookeeper
 public abstract class BenchmarkClient implements Runnable {
+	protected Thread _thread;
 	protected ZooKeeperBenchmark _zkBenchmark;
-	protected String _host; 			// the host this client is connecting to
-	protected CuratorFramework _client; // the actual client
-	protected TestType _type; 			// current test
+	protected String _host; 				// the host this client is connecting to
+	protected CuratorFramework _client; 	// the actual client
+	protected AsyncCuratorFramework _async; // the async wrapper
+	protected TestType _type; 				// current test
 	protected int _attempts;
 	protected String _path;
 	protected int _id;
 	protected int _count;
 	protected int _countTime;
 	protected Timer _timer;
-
-	protected int _highestN;
-	protected int _highestDeleted;
+	protected List _lock;
 
 	protected BufferedWriter _latenciesFile;
 
 	private static final Logger LOG = Logger.getLogger(BenchmarkClient.class);
 
-	// Simple constructor
 	public BenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
 			throws IOException {
 		_zkBenchmark = zkBenchmark; // The calling ZooKeeperBenchmark obj
@@ -54,32 +54,28 @@ public abstract class BenchmarkClient implements Runnable {
 
 		_client = CuratorFrameworkFactory.builder().connectString(_host).namespace(namespace)
 				.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000).build();
+		_async = AsyncCuratorFramework.wrap(_client);
 		_type = TestType.UNDEFINED;
-		_attempts = attempts; 	// This is avgOps. The average # of operations to send to the server
-		_id = id; 				// This clients index. Essentially, what server does this client connect to
+		_attempts = attempts;
+		_id = id;
 		_path = "/client" + id;
 		// _path = "/client-contention";
 		_timer = new Timer();
-		_highestN = 0;
-		_highestDeleted = 0;
+		_lock = Collections.synchronizedList(new LinkedList());
 	}
 
-	// Where multithread execution begins
 	@Override
 	public void run() {
-		// If client not started, start it
 		if (!_client.isStarted())
 			_client.start();
 
-		// If cleaning, then execute doCleaning (not sure what cleaning means)
 		if (_type == TestType.CLEANING) {
 			doCleaning();
 			return;
 		}
 
-		zkAdminCommand("srst"); // Reset ZK server's statistics
+		zkAdminCommand("srst");
 
-		// Wait for all client threads to be ready. Block at barrier
 		try {
 			_zkBenchmark.getBarrier().await();
 		} catch (InterruptedException e) {
@@ -91,11 +87,7 @@ public abstract class BenchmarkClient implements Runnable {
 		_count = 0;
 		_countTime = 0;
 
-		// Create a directory to work in
 		try {
-			// Check if path exits.
-			// Each client thread will have their own node that they write to avoid conflict
-			// Eric: Can we potentially do something where we introduce a BIT of contention?
 			Stat stat = _client.checkExists().forPath(_path);
 			if (stat == null) {
 				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
@@ -104,14 +96,10 @@ public abstract class BenchmarkClient implements Runnable {
 			LOG.error("Error while creating working directory", e);
 		}
 
-		// Create a timer to check when we're finished. 
-		// Schedule it to run periodically in case we want to record periodic statistics
 		int interval = _zkBenchmark.getInterval();
 
-		// After _interval milliseconds have passed, execute the function FinishTimer()
 		_timer.scheduleAtFixedRate(new FinishTimer(), interval, interval);
 
-		// Create a new output file for this particular client
 		try {
 			if (_type == TestType.READ || _type == TestType.CREATE || _type == TestType.DELETE) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
@@ -119,24 +107,21 @@ public abstract class BenchmarkClient implements Runnable {
 			} else if (_type == TestType.MIXREADWRITE) {
 				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
 																			+ "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
+			}  else if (_type == TestType.AR) {
+				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/last/" + _id + "-" + _type
+																			+ "_timings.dat")));
 			} else {
-				LOG.error("Unknown test type");
+				LOG.error("Unknown test type ");
 			}
 		} catch (IOException e) {
 			LOG.error("Error while creating output file", e);
 		}
 
-		// Submit the requests!
-		// Blocking
-		submit(_attempts, _type); // Abstract
+		// Submit the requests! Blocking
+		submit(_attempts, _type);
 
-		// Test is complete. Print some stats and go home.
-		// Zookeeper server keeps track of some stats. This zkAdminCommand
-		// Tells zookeeper to execute the "stat" command and give the stats back to this
-		// running thread
 		zkAdminCommand("stat");
 
-		// Clean up by closing files and logging completion time
 		try {
 			if (_latenciesFile != null)
 				_latenciesFile.close();
@@ -145,18 +130,9 @@ public abstract class BenchmarkClient implements Runnable {
 		}
 		LOG.info("Client #" + _id + " -- Current test complete. " + "Completed " + _count + " operations.");
 
-		// Notify ZooKeeperBenchmark object that this thread is done computing
 		_zkBenchmark.notifyFinished(_id);
 	}
 
-	// TimerTask is a class that is used with Timer. 
-	// Allows for repeated execution by a Timer on a fixed interval.
-	// Just increment _countTime every _interval milliseconds.
-	// Recall, _deadline is computed as: totaltime / _interval.
-	// So if totaltime = 30000 and _interval = 200
-	// Then 30000/200 = 150.
-	// 150 represents the total number of times the clock needs to tick (with an interval of _interval)
-	// So each time _interval milliseconds pass, we tick countTime by 1.
 	class FinishTimer extends TimerTask {
 		@Override
 		public void run() {
@@ -170,42 +146,21 @@ public abstract class BenchmarkClient implements Runnable {
 	}
 
 	void doCleaning() {
-		try {
-			deleteChildren();
-		} catch (Exception e) {
-			LOG.error("Exception while deleting old znodes", e);
-		}
-
 		_zkBenchmark.notifyFinished(_id);
-	}
-
-	/* Delete all the child znodes created by this client */
-	void deleteChildren() throws Exception {
-		List<String> children;
-
-		do {
-			children = _client.getChildren().forPath(_path);
-			for (String child : children) {
-				_client.delete().inBackground().forPath(_path + "/" + child);
-			}
-			Thread.sleep(2000);
-		} while (children.size() != 0);
 	}
 
 	void recordEvent(CuratorEvent event) {
 		ZooKeeperContext ctx = (ZooKeeperContext) event.getContext();
-		if (ctx.type != _type || ctx.ratio != _zkBenchmark.getReadPercentage()) {
-			System.out.println("** Error, should not happen");
-		}
+		// if (ctx.type != _type || ctx.ratio != _zkBenchmark.getReadPercentage()) {
+		// 	System.out.println("** Error, context type is " + ctx.type + " while current type is " + _type);
+		// 	System.out.println("** Error, context ratio is " + ctx.ratio + " while current ratio is " + _zkBenchmark.getReadPercentage());
+		// }
 		recordElapsedInterval(ctx.time);
 	}
 
-	// startTime here represents the time when ONE request was sent
 	void recordElapsedInterval(Double startTime) {
-		// compute endtime which is when ONE request finishes.
 		double endtime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
-		// Write start and end latencies to output file
 		try {
 			_latenciesFile.write(startTime.toString() + " " + Double.toString(endtime) + "\n");
 		} catch (IOException e) {
@@ -213,7 +168,6 @@ public abstract class BenchmarkClient implements Runnable {
 		}
 	}
 
-	/* Send a command directly to the ZooKeeper server */
 	void zkAdminCommand(String cmd) {
 		String host = _host.split(":")[0];
 		int port = Integer.parseInt(_host.split(":")[1]);
@@ -262,6 +216,18 @@ public abstract class BenchmarkClient implements Runnable {
 		_type = type;
 	}
 
+	List getLock() {
+		return _lock;
+	}
+
+	TestType getCurrentTest() {
+		return _type;
+	}
+
+	void setThread(Thread thread) {
+		_thread = thread;
+	}
+
 	abstract protected void submit(int n, TestType type);
 
 	/**
@@ -271,7 +237,7 @@ public abstract class BenchmarkClient implements Runnable {
 	 * and wait
 	 * 
 	 * @param n
-	 */
+	 **/
 	abstract protected void resubmit(int n);
 
 	abstract protected void finish();

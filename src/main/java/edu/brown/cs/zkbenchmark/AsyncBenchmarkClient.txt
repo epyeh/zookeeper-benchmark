@@ -6,8 +6,8 @@ import java.io.IOException;
 
 import org.apache.log4j.Logger;
 
-import com.netflix.curator.framework.api.CuratorListener;
-import com.netflix.curator.framework.listen.ListenerContainer;
+import org.apache.curator.framework.api.CuratorListener;
+import org.apache.curator.framework.api.ListenerContainer;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -53,7 +53,7 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 			submitRequestsWrapped(n, type);
 		} catch (Exception e) {
 			// What can you do? for some reason
-			// com.netflix.curator.framework.api.Pathable.forPath() throws Exception
+			// org.apache.curator.framework.api.Pathable.forPath() throws Exception
 
 			// just log the error, not sure how to handle this exception correctly
 			LOG.error("Exception while submitting requests", e);
@@ -87,6 +87,10 @@ public class AsyncBenchmarkClient extends BenchmarkClient {
 				case UNDEFINED:
 					LOG.error("Test type was UNDEFINED. No tests executed");
 					break;
+
+				case AR:
+					break;
+					
 				default:
 					LOG.error("Unknown Test Type");
 			}
