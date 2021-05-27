@@ -5,6 +5,8 @@ import java.io.FileWriter;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.Random;
+import java.util.List;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletionStage;
 
@@ -15,7 +17,10 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 import org.apache.log4j.Logger;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.framework.api.CuratorEventType;
+import org.apache.curator.framework.api.BackgroundCallback;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -56,58 +61,57 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					break;
 
 				case AR:
-					// this.setTest(TestType.ACQUIRE);
+					String mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(_lockPath, new byte[0]);
+					String nodeName = mynode.substring(1);
+					LOG.info("Client #" + _id + " creates a node: " + nodeName);
 					while (true) {
-						try {
-							_client.create().withMode(CreateMode.EPHEMERAL).forPath(_lockPath, new byte[0]);
-							Stat stat = _client.checkExists().forPath(_lockPath);
-							if (stat == null) {
-								continue;
-							}
-							LOG.info("Client #" + _id + " acquires the lock");
+						_client.sync().forPath("/");
+						List<String> children = _client.getChildren().forPath("/");
+						Collections.sort(children);
+						LOG.info("Client #" + _id + " views children: " + children);
+						if (children.get(0).equals(nodeName)) {
 							break;
-						} catch (NodeExistsException e) {
-							_async.watched().checkExists().forPath(_lockPath).event().thenAccept(event -> {
-								if (true) {
-									LOG.info("Client #" + _id + " wakes up by " + event.getType());
+						} else {
+							int idx = children.indexOf(nodeName);
+							LOG.info("Client #" + _id + " watches " + children.get(idx-1));
+							Stat stat = _client.checkExists().watched().inBackground(new BackgroundCallback() {
+								@Override
+								public void processResult(CuratorFramework curator, CuratorEvent event) throws Exception {
 									synchronized (_lock) {
 										_lock.notify();
 									}
 								}
+							}).forPath("/"+children.get(idx-1));
 
-								((CompletionStage<WatchedEvent>) event).exceptionally(exception -> {
-									LOG.warn("Client #" + _id + " should not happen");
-									return null;
-								});
+							// _async.watched().checkExists().forPath("/"+children.get(idx-1)).event().thenAccept(event -> {
+							// 	LOG.info("Client #" + _id + " wakes up by " + event.getType() + " of " + children.get(idx-1));
+							// 	synchronized (_lock) {
+							// 		_lock.notify();
+							// 	}
+							// 	((CompletionStage<WatchedEvent>) event).exceptionally(exception -> {
+							// 		LOG.warn("Client #" + _id + " should not happen");
+							// 		return null;
+							// 	});
 
-							});
-
-							LOG.info("Client #" + _id + " fails to acquire the lock, wait to be waked up by the watcher callback");
-							synchronized (_lock) {
-								// _lock.wait();
-								_lock.wait((long) 100);
+							// });
+							if (stat != null) {
+								synchronized (_lock) {
+									_lock.wait();
+								}
 							}
 						}
 					}
 
-					while (true)
+					while (true) {
 						try {
-							// // ToDo need to check exists first
-							// Stat stat = _client.checkExists().forPath(_lockPath);
-							// if (stat != null) {
-							// 	_client.delete().forPath(_lockPath);
-							// 	LOG.info("Client #" + _id + " releases the lock");
-							// 	break;
-							// } else {
-							// 	LOG.warn("Client #" + _id + " fails to release the lock");
-							// }
-							_client.delete().forPath(_lockPath);
-							LOG.info("Client #" + _id + " releases the lock");
-							break;
+							_client.delete().forPath(mynode);
 						} catch (Exception e) {
 							LOG.info("Client #" + _id + " fails to release the lock");
 						}
+						break;
+					}
 					break;
+					
 				default:
 					LOG.error("Unknown Test Type");
 
@@ -117,20 +121,7 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 			_count++; 							
 			_zkBenchmark.incrementFinished();
 
-			// _syncfin will be set to true when finish() is called.
-			// This is called in BenchmarkClient under FinishTimer.
-			// Finish Timer cancels the timer and then tells the sync client to stop issuing requests by breaking out
 			if (_syncfin) {
-				if (type == TestType.AR) {
-					try {
-						_client.create().withMode(CreateMode.EPHEMERAL).forPath(_lockPath, new byte[0]);
-						// sleep for 10ms, wait for the other clients to start the watcher
-						Thread.sleep(10);
-						_client.delete().forPath(_lockPath);
-					} catch (Exception e) {
-						// do nothing
-					}
-				}
 				break;
 			}
 		}

@@ -42,7 +42,7 @@ public abstract class BenchmarkClient implements Runnable {
 	protected int _countTime;
 	protected Timer _timer;
 	protected List _lock;
-	protected String _lockPath = "/lock";
+	protected String _lockPath = "/lock-";
 
 	protected BufferedWriter _latenciesFile;
 

@@ -80,7 +80,7 @@ public class ZooKeeperBenchmark {
 		_running = new HashMap<Integer, Thread>();
 		// ToDo, hardcode to 1 for debug
 		_clients = new BenchmarkClient[serverList.size()];
-		// _clients = new BenchmarkClient[2];
+		// _clients = new BenchmarkClient[3];
 		_barrier = new CyclicBarrier(_clients.length + 1);
 		_deadline = totaltime / _interval;
 
