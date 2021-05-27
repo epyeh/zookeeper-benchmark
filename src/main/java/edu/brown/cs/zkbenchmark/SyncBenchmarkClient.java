@@ -96,22 +96,19 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 										// _lock.notify();
 										// }
 										LOG.info("Counting down latch for: " + "Client #" + _id);
-											latch.countDown();
+										latch.countDown();
 									}
 								}).forPath(previousNode);
 
 								if (stat != null) {
 									LOG.info("Client #" + _id + " watches the lock " + previousNode);
-									LOG.info("stat is not null for: Client #" + _id);
 									// synchronized (_lock) {
 									// 	LOG.info("About to wait for: " + "Client #" + _id);
 									// 	_lock.wait();
 									// 	LOG.info("Past Wait for: " + "Client #" + _id);
 									// }
-									LOG.info("About to wait for: " + "Client #" + _id);
 									latch.await();
-									LOG.info("Past Wait for: " + "Client #" + _id);
-								}else{
+								} else {
 									LOG.info("stat is null for: Client #" + _id + " immediately retry to acquire lock by calling getChildren");
 								}
 
