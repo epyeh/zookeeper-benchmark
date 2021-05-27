@@ -20,7 +20,8 @@ import org.apache.log4j.Logger;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.framework.api.CuratorEventType;
-import org.apache.curator.framework.api.BackgroundCallback;
+import org.apache.curator.framework.api.CuratorWatcher;
+import org.apache.curator.x.async.WatchMode;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -61,43 +62,48 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					break;
 
 				case AR:
-					String mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(_lockPath, new byte[0]);
-					String nodeName = mynode.substring(1);
-					LOG.info("Client #" + _id + " creates a node: " + nodeName);
+					String mynode = "";
+					String nodeName = "";
+					try {
+						mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(_lockPath, new byte[0]);
+						nodeName = mynode.substring(1);
+						LOG.info("Client #" + _id + " creates the node " + nodeName);
+					} catch (Exception e) {
+						LOG.error("Error: " + e);
+					}
+					
 					while (true) {
-						_client.sync().forPath("/");
 						List<String> children = _client.getChildren().forPath("/");
 						Collections.sort(children);
 						LOG.info("Client #" + _id + " views children: " + children);
+						
 						if (children.get(0).equals(nodeName)) {
+							LOG.info("Client #" + _id + " acquires the lock " + nodeName);
 							break;
 						} else {
 							int idx = children.indexOf(nodeName);
-							LOG.info("Client #" + _id + " watches " + children.get(idx-1));
-							Stat stat = _client.checkExists().watched().inBackground(new BackgroundCallback() {
-								@Override
-								public void processResult(CuratorFramework curator, CuratorEvent event) throws Exception {
+							String previousNode = "/" + children.get(idx - 1);
+
+							try {
+								Stat stat = _client.checkExists().usingWatcher(new CuratorWatcher() {
+									@Override
+        							public void process(WatchedEvent event) throws Exception {
+										LOG.info("event: " + event);
+										synchronized (_lock) {
+											_lock.notify();
+										}
+									}
+								}).forPath(previousNode);
+
+								if (stat != null) {
+									LOG.info("Client #" + _id + " watches the lock " + previousNode);
 									synchronized (_lock) {
-										_lock.notify();
+										_lock.wait();
 									}
 								}
-							}).forPath("/"+children.get(idx-1));
 
-							// _async.watched().checkExists().forPath("/"+children.get(idx-1)).event().thenAccept(event -> {
-							// 	LOG.info("Client #" + _id + " wakes up by " + event.getType() + " of " + children.get(idx-1));
-							// 	synchronized (_lock) {
-							// 		_lock.notify();
-							// 	}
-							// 	((CompletionStage<WatchedEvent>) event).exceptionally(exception -> {
-							// 		LOG.warn("Client #" + _id + " should not happen");
-							// 		return null;
-							// 	});
-
-							// });
-							if (stat != null) {
-								synchronized (_lock) {
-									_lock.wait();
-								}
+							} catch (Exception e) {
+								LOG.error("Error: " + e);
 							}
 						}
 					}
@@ -105,6 +111,7 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					while (true) {
 						try {
 							_client.delete().forPath(mynode);
+							LOG.info("Client #" + _id + " releases the lock " + nodeName);
 						} catch (Exception e) {
 							LOG.info("Client #" + _id + " fails to release the lock");
 						}

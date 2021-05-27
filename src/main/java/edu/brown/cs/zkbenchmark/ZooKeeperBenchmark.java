@@ -79,8 +79,8 @@ public class ZooKeeperBenchmark {
 
 		_running = new HashMap<Integer, Thread>();
 		// ToDo, hardcode to 1 for debug
-		_clients = new BenchmarkClient[serverList.size()];
-		// _clients = new BenchmarkClient[3];
+		// _clients = new BenchmarkClient[serverList.size()];
+		_clients = new BenchmarkClient[2];
 		_barrier = new CyclicBarrier(_clients.length + 1);
 		_deadline = totaltime / _interval;
 
@@ -95,8 +95,8 @@ public class ZooKeeperBenchmark {
 		int avgOps = _totalOps / serverList.size();
 
 		// ToDo, hardcode to 1 for debug
-		for (int i = 0; i < serverList.size(); i++) {
-		// for (int i = 0; i < 2; i++) {
+		// for (int i = 0; i < serverList.size(); i++) {
+		for (int i = 0; i < 2; i++) {
 			if (sync) {
 				_clients[i] = new SyncBenchmarkClient(this, serverList.get(i), "zkTest", avgOps, i);
 			} else {
