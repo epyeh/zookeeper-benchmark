@@ -298,6 +298,18 @@ public class ZooKeeperBenchmark {
 											// value
 	}
 
+	/* return the max time consumed by each thread */
+	double getTime() {
+		double ret = 0;
+
+		for (int i = 0; i < _clients.length; i++) {
+			if (ret < _clients[i].getTimeCount())
+				ret = _clients[i].getTimeCount();
+		}
+
+		return (ret * _interval) / 1000.0;
+	}
+
 	CyclicBarrier getBarrier() {
 		return _barrier;
 	}
