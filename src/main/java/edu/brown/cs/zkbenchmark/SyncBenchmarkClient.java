@@ -35,10 +35,12 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 	private static final Logger LOG = Logger.getLogger(SyncBenchmarkClient.class);
 
-	private static final int TIMEOUT_DURATION = 5;	// Represents the timeout duration for a synchronous sync call to return. Units is seconds
+	private static final int TIMEOUT_DURATION = 5; // Represents the timeout duration for a
+													// synchronous sync call to return. Units is
+													// seconds
 
-	public SyncBenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
-			throws IOException {
+	public SyncBenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace,
+			int attempts, int id) throws IOException {
 		super(zkBenchmark, host, namespace, attempts, id); // Initialize variables
 	}
 
@@ -58,19 +60,9 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		_totalOps = _zkBenchmark.getCurrentTotalOps();
 		byte data[];
 
-		// Eric: Why do they use _totalOps.get(). Why not just use n? What's the point
-		// of passing _attempts from BenchmarkClient? Shouldn't it be n?
-		// Every client shouldn't be looping over the total number of operations. it
-		// should be the average # of operations they need to complete
-
-		// I would say this is realy a nasty code.
-		// As far as I can tell,
-		// the _totalOps is the number of outstanding ops
-		// and forget about the initial value of _totalOps
-		// The stopping signal is _syncfin
-
 		for (int i = 0; true; i++) {
-			double submitTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
+			double submitTime =
+					((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
 			switch (type) {
 				// Read 1 znode
@@ -78,56 +70,7 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					_client.getData().forPath(_path);
 					break;
 
-				// Set data for 1 znode
-				case SETSINGLE:
-					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.setData().forPath(_path, data);
-					break;
-
-				// Set data for multiple znodes
-				case SETMULTI:
-					try {
-						data = new String(_zkBenchmark.getData() + i).getBytes();
-
-						// What does _count % _highestN mean?
-						// _count represents the # of operations completed
-						// _highestN represents the # of nodes that were created
-						// They compute _count % _highestN because they want
-						// to cycle through all of the nodes they created
-						// and try setting to them
-						//
-						// example:
-						// client0
-						// znode0, znode1, znode2, znode3, ...
-						// multiset will try to write to znode0, znode1, znode2, znode3 ...
-						// That's what they mean by multiset
-
-						_client.setData().forPath(_path + "/" + (_count % _highestN), data);
-					} catch (NoNodeException e) {
-						LOG.warn("No such node when setting data to mutiple nodes. " + "_path = " + _path
-								+ ", _count = " + _count + ", _highestN = " + _highestN, e);
-					}
-					break;
-
-				// Create new node with path _path and _count
-				case CREATE:
-					data = new String(_zkBenchmark.getData() + i).getBytes();
-					_client.create().forPath(_path + "/" + _count, data);
-					_highestN++; // for use with SETMULTI
-					break;
-
-				// Case for trying to delete nodes
-				case DELETE:
-					try {
-						_client.delete().forPath(_path + "/" + _count);
-					} catch (NoNodeException e) {
-						if (LOG.isDebugEnabled()) {
-							LOG.debug("No such node (" + _path + "/" + _count + ") when deleting nodes", e);
-						}
-					}
-					break;
-
-								// Case for trying to do mixed reads and writes to nodes
+				// Case for trying to do mixed reads and writes to nodes
 				case MIXREADWRITE:
 
 					double randDouble = Math.random();
@@ -149,11 +92,13 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					_zkBenchmark.incrementFinished();
 
 					// Synchronous Sync
-					boolean res = this.synchronousSync(Duration.ofSeconds(TIMEOUT_DURATION));	// 5 seconds for sync to return or we get false
-					
-					if(!res){
-						System.out.println("Sync did not return within " + TIMEOUT_DURATION + " seconds. This should not happen!!");
-						LOG.error("Sync did not return within " + TIMEOUT_DURATION + " seconds. This should not happen.");
+					// 5 seconds for sync to return or we get false
+					boolean res = this.synchronousSync(Duration.ofSeconds(TIMEOUT_DURATION)); 
+					if (!res) {
+						System.out.println("Sync did not return within " + TIMEOUT_DURATION
+								+ " seconds. This should not happen!!");
+						LOG.error("Sync did not return within " + TIMEOUT_DURATION
+								+ " seconds. This should not happen.");
 					}
 
 					// Synchronous Read
@@ -161,21 +106,23 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					break;
 
 				case AR:
+				
 					String mynode = "";
 					String nodeName = "";
 					try {
-						mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(_lockPath, new byte[0]);
+						mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
+								.forPath(_lockPath, new byte[0]);
 						nodeName = mynode.substring(_lockRoot.length() + 1);
 						LOG.info("Client #" + _id + " creates the node " + nodeName);
 					} catch (Exception e) {
 						LOG.error("Error: " + e);
 					}
-					
+
 					while (true) {
 						List<String> children = _client.getChildren().forPath(_lockRoot);
 						Collections.sort(children);
 						LOG.info("Client #" + _id + " views children: " + children);
-						
+
 						if (children.get(0).equals(nodeName)) {
 							LOG.info("Client #" + _id + " acquires the lock " + nodeName);
 							break;
@@ -185,20 +132,25 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 							try {
 								final CountDownLatch latch = new CountDownLatch(1);
-								Stat stat = _client.checkExists().usingWatcher(new CuratorWatcher() {
-									@Override
-        							public void process(WatchedEvent event) throws Exception {
-										// LOG.info("event: " + event);
-										LOG.info("Counting down latch for: " + "Client #" + _id);
-										latch.countDown();
-									}
-								}).forPath(previousNode);
+								Stat stat =
+										_client.checkExists().usingWatcher(new CuratorWatcher() {
+											@Override
+											public void process(WatchedEvent event)
+													throws Exception {
+												// LOG.info("event: " + event);
+												LOG.info("Counting down latch for: " + "Client #"
+														+ _id);
+												latch.countDown();
+											}
+										}).forPath(previousNode);
 
 								if (stat != null) {
-									LOG.info("Client #" + _id + " watches the lock " + previousNode);
+									LOG.info(
+											"Client #" + _id + " watches the lock " + previousNode);
 									latch.await();
 								} else {
-									LOG.info("stat is null for: Client #" + _id + " immediately retry to acquire lock by calling getChildren");
+									LOG.info("stat is null for: Client #" + _id
+											+ " immediately retry to acquire lock by calling getChildren");
 								}
 
 							} catch (Exception e) {
@@ -228,9 +180,12 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 			recordElapsedInterval(new Double(submitTime));
 			_count++; // increment _count to keep track of how many operations completed
-			_zkBenchmark.incrementFinished(); // increment the # of operations that have been completed
-												// This is the aggregate global var across all threads
-												// to keep track of the total # of operations ALL the threads
+			_zkBenchmark.incrementFinished(); // increment the # of operations that have been
+												// completed
+												// This is the aggregate global var across all
+												// threads
+												// to keep track of the total # of operations ALL
+												// the threads
 												// together have been able to complete
 
 			// _syncfin will be set to true when finish() is called.
@@ -249,36 +204,38 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 	}
 
 	/**
-	 * in fact, n here can be arbitrary number as synchronous operations can be
-	 * stopped after finishing any operation.
+	 * in fact, n here can be arbitrary number as synchronous operations can be stopped after
+	 * finishing any operation.
 	 */
 	@Override
 	protected void resubmit(int n) {
 		_totalOps.getAndAdd(n);
 	}
 
-	
+
 
 	/**
- 	* Performs a blocking sync operation.  Returns true if the sync completed normally, false if it timed out or
-   	* was interrupted.
-   	*/
+	 * Performs a blocking sync operation. Returns true if the sync completed normally, false if it
+	 * timed out or was interrupted.
+	 */
 	public boolean synchronousSync(Duration timeout) {
-		CuratorFramework curator = _client; 
+		CuratorFramework curator = _client;
 		try {
-		// Curator sync() is always a background operation.  Use a latch to block until it finishes.
-		final CountDownLatch latch = new CountDownLatch(1);
-		curator.sync().inBackground(new BackgroundCallback() {
-			@Override
-			public void processResult(CuratorFramework curator, CuratorEvent event) throws Exception {
-				if (event.getType() == CuratorEventType.SYNC) {
-					latch.countDown();
+			// Curator sync() is always a background operation. Use a latch to block until it
+			// finishes.
+			final CountDownLatch latch = new CountDownLatch(1);
+			curator.sync().inBackground(new BackgroundCallback() {
+				@Override
+				public void processResult(CuratorFramework curator, CuratorEvent event)
+						throws Exception {
+					if (event.getType() == CuratorEventType.SYNC) {
+						latch.countDown();
+					}
 				}
-			}
-		}).forPath(_path);
+			}).forPath(_path);
 
-		// Wait for sync to complete.
-		return latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+			// Wait for sync to complete.
+			return latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			System.out.println("Error: " + e);
 			LOG.info("exception " + e);

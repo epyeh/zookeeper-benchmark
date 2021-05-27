@@ -16,24 +16,13 @@ import java.util.concurrent.BrokenBarrierException;
 import org.apache.zookeeper.data.Stat;
 import org.apache.log4j.Logger;
 
-// Curator is a more specialized client. Essentially curator takes care of managing connection (from client side) to zookeeper server
-// It handles retries and other edge cases. Look up curator zookeeper for full doc
-// import com.netflix.curator.framework.CuratorFramework;
-// import com.netflix.curator.framework.CuratorFrameworkFactory;
-// import com.netflix.curator.framework.api.CuratorEvent;
-// import com.netflix.curator.retry.RetryNTimes;
 import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.retry.RetryNTimes;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.api.SyncBuilder;
-import org.apache.curator.framework.api.Backgroundable;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
-// Client code to connect to zookeeper.
-// implements Runnable because we are going to multithread the 
-// execution of client operations to zookeeper
 public abstract class BenchmarkClient implements Runnable {
 	protected ZooKeeperBenchmark _zkBenchmark;
 	protected String _host; // the host this client is connecting to
@@ -56,15 +45,14 @@ public abstract class BenchmarkClient implements Runnable {
 	private static final Logger LOG = Logger.getLogger(BenchmarkClient.class);
 
 	// Simple constructor
-	public BenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace, int attempts, int id)
-			throws IOException {
+	public BenchmarkClient(ZooKeeperBenchmark zkBenchmark, String host, String namespace,
+			int attempts, int id) throws IOException {
 		_zkBenchmark = zkBenchmark; // The calling ZooKeeperBenchmark obj
-		_host = host; // The specific client this server will connect to
-		// Generate the curator object.
-		// name space....?
+		_host = host;
 		_client = CuratorFrameworkFactory.builder().connectString(_host).namespace(namespace)
-					.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000).build();
-		
+				.retryPolicy(new RetryNTimes(Integer.MAX_VALUE, 1000)).connectionTimeoutMs(5000)
+				.build();
+
 		_type = TestType.UNDEFINED;
 		_attempts = attempts; // This is avgOps. The average # of operations to send to the server
 		_id = id; // This clients index. Essentially, what server does this client connect to and
@@ -103,7 +91,6 @@ public abstract class BenchmarkClient implements Runnable {
 		_countTime = 0;
 
 		// Create a directory to work in
-
 		try {
 			// Check if path exits.
 			// Each client thread will have their own node that they write to avoid conflict
@@ -119,7 +106,7 @@ public abstract class BenchmarkClient implements Runnable {
 			stat = _client.checkExists().forPath(_lockRoot);
 			if (stat == null) {
 				_client.create().forPath(_lockRoot, new byte[0]);
-			} 
+			}
 
 		} catch (Exception e) {
 			LOG.error("Error while creating working directory", e);
@@ -136,19 +123,13 @@ public abstract class BenchmarkClient implements Runnable {
 		// Create a new output file for this particular client
 		try {
 
-			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
-				|| _type == TestType.CREATE || _type == TestType.DELETE || _type == TestType.WRITESYNCREAD) {
-				_latenciesFile = new BufferedWriter(
-								 new FileWriter(
-								 new File("results/last/" + _id + "-" + _type + "_timings.dat")));
+			if (_type == TestType.READ || _type == TestType.WRITESYNCREAD || _type == TestType.AR) {
+				_latenciesFile = new BufferedWriter(new FileWriter(
+						new File("results/last/" + _id + "-" + _type + "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
 				_latenciesFile = new BufferedWriter(
-								 new FileWriter(
-								 new File("results/last/" + _id + "-" + _type + "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
-			} else if (_type == TestType.AR) {
-				_latenciesFile = new BufferedWriter(
-								 new FileWriter(
-								 new File("results/last/" + _id + "-" + _type + "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
+						new FileWriter(new File("results/last/" + _id + "-" + _type + "-"
+								+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}
@@ -157,7 +138,7 @@ public abstract class BenchmarkClient implements Runnable {
 		}
 
 		// Submit the requests!
-
+		// Blocking!
 		submit(_attempts, _type); // Abstract
 
 
@@ -169,15 +150,16 @@ public abstract class BenchmarkClient implements Runnable {
 
 		// Clean up by closing files and logging completion time
 		try {
-			if (_latenciesFile != null){
+			if (_latenciesFile != null) {
 				_latenciesFile.close();
 			}
-				
+
 		} catch (IOException e) {
 			LOG.warn("Error while closing output file:", e);
 		}
 
-		LOG.info("Client #" + _id + " -- Current test complete. " + "Completed " + _count + " operations.");
+		LOG.info("Client #" + _id + " -- Current test complete. " + "Completed " + _count
+				+ " operations.");
 
 		// Notify ZooKeeperBenchmark object that this thread is done computing
 		_zkBenchmark.notifyFinished(_id);
@@ -271,7 +253,8 @@ public abstract class BenchmarkClient implements Runnable {
 
 			int len = is.read(b);
 			while (len >= 0) {
-				LOG.info("Client #" + _id + " is sending " + cmd + " command:\n" + new String(b, 0, len));
+				LOG.info("Client #" + _id + " is sending " + cmd + " command:\n"
+						+ new String(b, 0, len));
 				len = is.read(b);
 			}
 
@@ -304,10 +287,9 @@ public abstract class BenchmarkClient implements Runnable {
 	abstract protected void submit(int n, TestType type);
 
 	/**
-	 * for synchronous requests, to submit more requests only needs to increase the
-	 * total number of requests, here n can be an arbitrary number for asynchronous
-	 * requests, to submit more requests means that the client will do both submit
-	 * and wait
+	 * for synchronous requests, to submit more requests only needs to increase the total number of
+	 * requests, here n can be an arbitrary number for asynchronous requests, to submit more
+	 * requests means that the client will do both submit and wait
 	 * 
 	 * @param n
 	 */
