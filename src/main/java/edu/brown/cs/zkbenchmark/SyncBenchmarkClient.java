@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.WatchedEvent;
@@ -85,21 +86,33 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 							String previousNode = "/" + children.get(idx - 1);
 
 							try {
+								final CountDownLatch latch = new CountDownLatch(1);
 								Stat stat = _client.checkExists().usingWatcher(new CuratorWatcher() {
 									@Override
         							public void process(WatchedEvent event) throws Exception {
 										LOG.info("event: " + event);
-										synchronized (_lock) {
-											_lock.notify();
-										}
+										// synchronized (_lock) {
+										// LOG.info("Notifying: " + "Client #" + _id);
+										// _lock.notify();
+										// }
+										LOG.info("Counting down latch for: " + "Client #" + _id);
+											latch.countDown();
 									}
 								}).forPath(previousNode);
 
 								if (stat != null) {
 									LOG.info("Client #" + _id + " watches the lock " + previousNode);
-									synchronized (_lock) {
-										_lock.wait();
-									}
+									LOG.info("stat is not null for: Client #" + _id);
+									// synchronized (_lock) {
+									// 	LOG.info("About to wait for: " + "Client #" + _id);
+									// 	_lock.wait();
+									// 	LOG.info("Past Wait for: " + "Client #" + _id);
+									// }
+									LOG.info("About to wait for: " + "Client #" + _id);
+									latch.await();
+									LOG.info("Past Wait for: " + "Client #" + _id);
+								}else{
+									LOG.info("stat is null for: Client #" + _id + " immediately retry to acquire lock by calling getChildren");
 								}
 
 							} catch (Exception e) {
