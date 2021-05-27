@@ -3,31 +3,28 @@ package edu.brown.cs.zkbenchmark;
 import java.lang.Throwable;
 import java.time.Duration;
 import java.io.File;
-import java.io.BufferedWriter;
 import java.io.FileWriter;
-import java.util.Random;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.util.List;
+import java.util.Collections;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CountDownLatch;
 
-import org.apache.zookeeper.KeeperException.NoNodeException;
-import org.apache.log4j.Logger;
 import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.log4j.Logger;
 
-// import com.netflix.curator.framework.CuratorFramework;
-// import com.netflix.curator.framework.api.CuratorEventType;
-// import com.netflix.curator.framework.api.CuratorEvent;
-// import com.netflix.curator.framework.api.BackgroundCallback;
-
-// import org.apache.curator.framework.api.SyncBuilder;
-// import org.apache.curator.framework.imps.SyncBuilderImpl;
-import org.apache.curator.framework.api.CuratorEventType;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.framework.api.CuratorEventType;
+import org.apache.curator.framework.api.CuratorWatcher;
 import org.apache.curator.framework.api.BackgroundCallback;
-// import org.apache.curator.framework.api.Backgroundable;
-// import org.apache.curator.framework.api.BackgroundPathable;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -59,7 +56,6 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 	protected void submitWrapped(int n, TestType type) throws Exception {
 		_syncfin = false;
 		_totalOps = _zkBenchmark.getCurrentTotalOps();
-		LOG.info("* Initial totalOps = " + _totalOps.get());
 		byte data[];
 
 		// Eric: Why do they use _totalOps.get(). Why not just use n? What's the point
@@ -73,7 +69,7 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		// and forget about the initial value of _totalOps
 		// The stopping signal is _syncfin
 
-		for (int i = 0; i < _totalOps.get(); i++) {
+		for (int i = 0; true; i++) {
 			double submitTime = ((double) System.nanoTime() - _zkBenchmark.getStartTime()) / 1000000000.0;
 
 			switch (type) {
@@ -162,6 +158,64 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 					// Synchronous Read
 					_client.getData().forPath(_path);
+					break;
+
+				case AR:
+					String mynode = "";
+					String nodeName = "";
+					try {
+						mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL).forPath(_lockPath, new byte[0]);
+						nodeName = mynode.substring(_lockRoot.length() + 1);
+						LOG.info("Client #" + _id + " creates the node " + nodeName);
+					} catch (Exception e) {
+						LOG.error("Error: " + e);
+					}
+					
+					while (true) {
+						List<String> children = _client.getChildren().forPath(_lockRoot);
+						Collections.sort(children);
+						LOG.info("Client #" + _id + " views children: " + children);
+						
+						if (children.get(0).equals(nodeName)) {
+							LOG.info("Client #" + _id + " acquires the lock " + nodeName);
+							break;
+						} else {
+							int idx = children.indexOf(nodeName);
+							String previousNode = "/" + children.get(idx - 1);
+
+							try {
+								final CountDownLatch latch = new CountDownLatch(1);
+								Stat stat = _client.checkExists().usingWatcher(new CuratorWatcher() {
+									@Override
+        							public void process(WatchedEvent event) throws Exception {
+										// LOG.info("event: " + event);
+										LOG.info("Counting down latch for: " + "Client #" + _id);
+										latch.countDown();
+									}
+								}).forPath(previousNode);
+
+								if (stat != null) {
+									LOG.info("Client #" + _id + " watches the lock " + previousNode);
+									latch.await();
+								} else {
+									LOG.info("stat is null for: Client #" + _id + " immediately retry to acquire lock by calling getChildren");
+								}
+
+							} catch (Exception e) {
+								LOG.error("Error: " + e);
+							}
+						}
+					}
+
+					while (true) {
+						try {
+							_client.delete().forPath(mynode);
+							LOG.info("Client #" + _id + " releases the lock " + nodeName);
+						} catch (Exception e) {
+							LOG.info("Client #" + _id + " fails to release the lock");
+						}
+						break;
+					}
 					break;
 
 				case UNDEFINED:

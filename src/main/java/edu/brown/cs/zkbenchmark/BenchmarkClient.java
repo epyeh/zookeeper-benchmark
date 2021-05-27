@@ -45,6 +45,8 @@ public abstract class BenchmarkClient implements Runnable {
 	protected int _count;
 	protected int _countTime;
 	protected Timer _timer;
+	protected String _lockRoot = "/lock-root";
+	protected String _lockPath = _lockRoot + "/lock-";
 
 	protected int _highestN;
 	protected int _highestDeleted;
@@ -114,6 +116,10 @@ public abstract class BenchmarkClient implements Runnable {
 			if (stat == null) {
 				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
 			}
+			stat = _client.checkExists().forPath(_lockRoot);
+			if (stat == null) {
+				_client.create().forPath(_lockRoot, new byte[0]);
+			} 
 
 		} catch (Exception e) {
 			LOG.error("Error while creating working directory", e);
@@ -131,12 +137,18 @@ public abstract class BenchmarkClient implements Runnable {
 		try {
 
 			if (_type == TestType.READ || _type == TestType.SETSINGLE || _type == TestType.SETMULTI
-					|| _type == TestType.CREATE || _type == TestType.DELETE || _type == TestType.WRITESYNCREAD) {
+				|| _type == TestType.CREATE || _type == TestType.DELETE || _type == TestType.WRITESYNCREAD) {
 				_latenciesFile = new BufferedWriter(
-						new FileWriter(new File("results/" + _id + "-" + _type + "_timings.dat")));
+								 new FileWriter(
+								 new File("results/last/" + _id + "-" + _type + "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
-				_latenciesFile = new BufferedWriter(new FileWriter(new File("results/" + _id + "-" + _type + "-"
-						+ this._zkBenchmark.getReadPercentage() + "_timings.dat")));
+				_latenciesFile = new BufferedWriter(
+								 new FileWriter(
+								 new File("results/last/" + _id + "-" + _type + "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
+			} else if (_type == TestType.AR) {
+				_latenciesFile = new BufferedWriter(
+								 new FileWriter(
+								 new File("results/last/" + _id + "-" + _type + "-" + this._zkBenchmark.getReadPercentage() + "_timings.dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}

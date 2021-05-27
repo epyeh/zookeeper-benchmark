@@ -9,9 +9,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier; // For synchronizing client threads
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.BrokenBarrierException;
 
 // For config file parsing
 import joptsimple.OptionException;
@@ -29,15 +29,15 @@ import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 
 public class ZooKeeperBenchmark {
-	private int _totalOps; // total operations requested by user
-	private AtomicInteger _currentTotalOps; // possibly increased # of ops so test last for requested time
+	private int _totalOps; 						// total operations requested by user
+	private AtomicInteger _currentTotalOps; 	// possibly increased # of ops so test last for requested time
 	private int _lowerbound;
 	private BenchmarkClient[] _clients;
 	private int _interval;
 	private HashMap<Integer, Thread> _running;
 	private AtomicInteger _finishedTotal;
 	private int _lastfinished;
-	private int _deadline; // in units of "_interval"
+	private int _deadline; 						// in units of "_interval"
 	private long _totalTimeSeconds;
 	private long _lastCpuTime;
 	private long _currentCpuTime;
@@ -48,10 +48,10 @@ public class ZooKeeperBenchmark {
 	private CyclicBarrier _barrier;
 	private Boolean _finished;
 	private double _readPercentage;
-	private static int cToS;	// represents the number of clients to servers. 2 means 2 clients for 1 server
+	private static int cToS;					// represents the number of clients to servers. 2 means 2 clients for 1 server
 
 	enum TestType {
-		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE, WRITESYNCREAD
+		READ, SETSINGLE, SETMULTI, CREATE, DELETE, CLEANING, UNDEFINED, MIXREADWRITE, WRITESYNCREAD, AR
 	}
 
 	private static final Logger LOG = Logger.getLogger(ZooKeeperBenchmark.class);
@@ -80,7 +80,7 @@ public class ZooKeeperBenchmark {
 		_interval = conf.getInt("interval");
 		_totalOps = conf.getInt("totalOperations");
 		_lowerbound = conf.getInt("lowerbound");
-		int totaltime = conf.getInt("totalTime"); // total time is the time for each test
+		int totaltime = conf.getInt("totalTime");
 		_totalTimeSeconds = Math.round((double) totaltime / 1000.0);
 		boolean sync = conf.getBoolean("sync");
 		cToS = conf.getInt("clientsToServer");
@@ -142,7 +142,7 @@ public class ZooKeeperBenchmark {
 	public void runBenchmark() {
 
 		// Create results directory if it doesn't exist
-		File directory = new File("./results");
+		File directory = new File("./results/last");
 		if (!directory.exists()) {
 			directory.mkdir();
 		}
@@ -155,20 +155,23 @@ public class ZooKeeperBenchmark {
 		 * rate of read requests.
 		 */
 
-		doTest(TestType.READ, "warm-up");
+		// doTest(TestType.READ, "warm-up");
 
-		doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
+		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
 		// This loop increments i by 10% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
-		for (int i = 0; i <= 100; i += 10) {
-			_readPercentage = i / 100.0;
-			doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
-		}
 
-		doTest(TestType.WRITESYNCREAD, "repeated write sync read");
+		doTest(TestType.AR, "acquire-release");
 
-		doTest(TestType.SETSINGLE, "repeated single-znode write");
+		// for (int i = 0; i <= 100; i += 10) {
+		// 	_readPercentage = i / 100.0;
+		// 	doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+		// }
+
+		// doTest(TestType.WRITESYNCREAD, "repeated write sync read");
+
+		// doTest(TestType.SETSINGLE, "repeated single-znode write");
 
 		// doTest(TestType.CREATE, "znode create");
 
@@ -208,8 +211,8 @@ public class ZooKeeperBenchmark {
 	}
 
 	/* This is where each individual test starts */
-
 	public void doTest(TestType test, String description) {
+		
 		_currentTest = test;
 		_finishedTotal = new AtomicInteger(0);
 		_lastfinished = 0;
@@ -226,14 +229,18 @@ public class ZooKeeperBenchmark {
 		try {
 			if (_currentTest == TestType.READ || _currentTest == TestType.SETSINGLE || _currentTest == TestType.SETMULTI
 					|| _currentTest == TestType.CREATE || _currentTest == TestType.DELETE || _currentTest == TestType.WRITESYNCREAD) {
-				_rateFile = new BufferedWriter(new FileWriter(new File("results/" + test + ".dat")));
+				_rateFile = new BufferedWriter(new FileWriter(new File("results/last/" + test + ".dat")));
 			} else if (_currentTest == TestType.MIXREADWRITE) {
 				_rateFile = new BufferedWriter(
-						new FileWriter(new File("results/" + test + "-" + _readPercentage + ".dat")));
+							new FileWriter(
+							new File("results/last/" + test + "-" + _readPercentage + ".dat")));
+			} else if (_currentTest == TestType.AR) {
+				_rateFile = new BufferedWriter(
+							new FileWriter(
+							new File("results/last/" + test + ".dat")));
 			} else {
 				LOG.error("Unknown test type");
 			}
-
 		} catch (IOException e) {
 			LOG.error("Unable to create output file", e);
 		}
@@ -243,7 +250,6 @@ public class ZooKeeperBenchmark {
 		_lastCpuTime = _startCpuTime;
 
 		// Start the testing clients!
-
 		for (int i = 0; i < _clients.length; i++) {
 			_clients[i].setTest(test); // Set the test type
 			Thread tmp = new Thread(_clients[i]); // Create a new thread object
@@ -267,14 +273,14 @@ public class ZooKeeperBenchmark {
 
 		// After _interval milliseconds have passed, execute the function
 		// ResubmitTimer()
-		timer.scheduleAtFixedRate(new ResubmitTimer(), _interval, _interval);
+
+		// Yaosen, No Need to Resubmit
+		timer.scheduleAtFixedRate(new SampleTimer(), _interval, _interval);
 
 		// Wait for the test to finish
-
 		while (!_finished) {
 			// must be synchronized because multiple threads may try to delete
-			// their id from the map at the same time so we want to avoid concurrent write
-			// problem
+			// their id from the map at the same time so we want to avoid concurrent write problem
 			synchronized (_running) {
 				try {
 					_running.wait();
@@ -549,6 +555,56 @@ public class ZooKeeperBenchmark {
 												// client thread needs to complete
 				}
 			}
+		}
+	}
+
+	class SampleTimer extends TimerTask {
+		@Override
+		public void run() {
+			if (_currentTest == TestType.UNDEFINED) {
+				return;
+			}
+			// _finished is an atomic integer. .get() of atomic integer gives back the value
+			// finished then represents the # of operations finished at the time
+			// _finishedTotal.get() is called
+
+			int finished = _finishedTotal.get();
+			if (finished == 0) {
+				return;
+			}
+
+			// Get current CPU time
+			_currentCpuTime = System.nanoTime();
+
+			// If output file exists
+			if (_rateFile != null) {
+				try {
+					if (finished - _lastfinished > 0) {
+						// Record the time elapsed and current rate
+						String msg = ((double) (_currentCpuTime - _startCpuTime) / 1000000000.0) + " "
+									+ ((double) (finished - _lastfinished) / ((double) (_currentCpuTime - _lastCpuTime) / 1000000000.0));
+
+						// Break it down:
+						// This: ((double) (_currentCpuTime - _startCpuTime) / 1000000000.0)
+						// represents the total time elapsed since _startCpuTime is called. 
+						// So the total time (in seconds) since the barrier for thread
+
+						// This: ((double) (finished - _lastfinished)
+						// represents the # of requests finished since the last call to ResubmitTimer
+						// So the total # of requests completed in this current time period
+
+						// This: ((double) (_currentCpuTime - _lastCpuTime) / 1000000000.0))
+						// represents the total time elapsed since the last call to ResubmitTimer (in seconds). 
+						// So the total time elapsed for this current time period
+						_rateFile.write(msg + "\n");
+					}
+				} catch (IOException e) {
+					LOG.error("Error when writing to output file", e);
+				}
+			}
+
+			_lastCpuTime = _currentCpuTime; // Set _lastCpuTime to current cpuTime
+			_lastfinished = finished; 		// update _lastFinished to be the current # of finished requests
 		}
 	}
 }
