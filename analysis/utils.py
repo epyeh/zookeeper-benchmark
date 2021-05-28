@@ -20,8 +20,16 @@ def get_config(path = '../benchmark.conf'):
 def get_data(path):
     with open(path) as f:
         lines = f.readlines()
-        ts = [[float(l.strip().split(' ')[0]), float(l.strip().split(' ')[1])] for l in lines]
-        return ts
+        data = []
+        stat = {}
+        for line in lines:
+            line = line.strip()
+            if line:
+                if line[0] == '#':
+                    stat[line.split(' ')[0]] = float(line.split(' ')[1])
+                else:
+                    data.append([float(line.split(' ')[0]), float(line.split(' ')[1])])
+        return data, stat
 
 
 def get_files(type, op, prefix='../results/'):
@@ -118,7 +126,7 @@ def avg_rate(data, filter=-1):
         last_timestamp = _data[filter-1, 0]
         _data = _data[filter:, :]
         
-    print(_data.shape, last_timestamp)
+    # print(_data.shape, last_timestamp)
     n, _ = _data.shape
     for i in range(n):
         c = _data[i][0] # current timestamp
