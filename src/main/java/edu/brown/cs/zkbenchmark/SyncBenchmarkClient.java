@@ -112,6 +112,9 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					try {
 						mynode = _client.create().withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
 								.forPath(_lockPath, new byte[0]);
+						
+						_zkBenchmark.incrementFinished();
+						
 						nodeName = mynode.substring(_lockRoot.length() + 1);
 						LOG.info("Client #" + _id + " creates the node " + nodeName);
 					} catch (Exception e) {
@@ -120,6 +123,9 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 					while (true) {
 						List<String> children = _client.getChildren().forPath(_lockRoot);
+
+						_zkBenchmark.incrementFinished();
+
 						Collections.sort(children);
 						LOG.info("Client #" + _id + " views children: " + children);
 
@@ -144,6 +150,8 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 											}
 										}).forPath(previousNode);
 
+										_zkBenchmark.incrementFinished();
+
 								if (stat != null) {
 									LOG.info(
 											"Client #" + _id + " watches the lock " + previousNode);
@@ -162,6 +170,9 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					while (true) {
 						try {
 							_client.delete().forPath(mynode);
+
+							_zkBenchmark.incrementFinished();
+
 							LOG.info("Client #" + _id + " releases the lock " + nodeName);
 						} catch (Exception e) {
 							LOG.info("Client #" + _id + " fails to release the lock");
@@ -180,14 +191,17 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 			recordElapsedInterval(new Double(submitTime));
 			_count++; // increment _count to keep track of how many operations completed
-			_zkBenchmark.incrementFinished(); // increment the # of operations that have been
-												// completed
-												// This is the aggregate global var across all
-												// threads
-												// to keep track of the total # of operations ALL
-												// the threads
+			if (_type == TestType.AR) {
+				_zkBenchmark.incrementLock();
+			} else {
+				_zkBenchmark.incrementFinished(); // increment the # of operations that have been completed
+												// This is the aggregate global var across all threads
+												// to keep track of the total # of operations ALL the threads
 												// together have been able to complete
 
+			}
+
+			
 			// _syncfin will be set to true when finish() is called.
 			// This is called in BenchmarkClient under FinishTimer.
 			// Finish Timer cancels the timer and then tells the sync client to stop issuing
@@ -212,11 +226,9 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 		_totalOps.getAndAdd(n);
 	}
 
-
-
 	/**
-	 * Performs a blocking sync operation. Returns true if the sync completed normally, false if it
-	 * timed out or was interrupted.
+	 * Performs a blocking sync operation. Returns true if the sync completed normally, 
+	 * false if it timed out or was interrupted.
 	 */
 	public boolean synchronousSync(Duration timeout) {
 		CuratorFramework curator = _client;

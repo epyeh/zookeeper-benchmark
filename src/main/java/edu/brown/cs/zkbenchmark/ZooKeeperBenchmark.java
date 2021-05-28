@@ -36,6 +36,7 @@ public class ZooKeeperBenchmark {
 	private int _interval;
 	private HashMap<Integer, Thread> _running;
 	private AtomicInteger _finishedTotal;
+	private AtomicInteger _lockTotal;
 	private int _lastfinished;
 	private int _deadline; // in units of "_interval"
 	private long _totalTimeSeconds;
@@ -161,8 +162,8 @@ public class ZooKeeperBenchmark {
 		// the percentage of reads for this workload
 
 		// for (int i = 0; i <= 100; i += 10) {
-		// _readPercentage = i / 100.0;
-		// doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
+		// 	_readPercentage = i / 100.0;
+		// 	doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
 		// }
 
 		// doTest(TestType.WRITESYNCREAD, "repeated write sync read");
@@ -200,6 +201,9 @@ public class ZooKeeperBenchmark {
 		_lastfinished = 0;
 		_currentTotalOps = new AtomicInteger(_totalOps);
 		_finished = false;
+		if (test == TestType.AR) {
+			_lockTotal = new AtomicInteger(0);
+		}
 
 		System.out.print(
 				"Running " + description + " benchmark for " + _totalTimeSeconds + " seconds... ");
@@ -273,6 +277,9 @@ public class ZooKeeperBenchmark {
 		// Close files
 		try {
 			if (_rateFile != null) {
+				if (test == TestType.AR) {
+					_rateFile.write("\n" + "#total-acquire-release: " + _lockTotal.get());
+				}
 				_rateFile.close();
 			}
 		} catch (IOException e) {
@@ -292,10 +299,13 @@ public class ZooKeeperBenchmark {
 	}
 
 	void incrementFinished() {
-		_finishedTotal.incrementAndGet(); // There is no pure increment function. You must
-											// incrementAndGet
-											// even if you don't intend on using the returned back
-											// value
+		_finishedTotal.incrementAndGet(); // There is no pure increment function. 
+											// You must incrementAndGet
+											// even if you don't intend on using the returned back value
+	}
+
+	void incrementLock() {
+		_lockTotal.incrementAndGet();
 	}
 
 	/* return the max time consumed by each thread */
@@ -472,9 +482,7 @@ public class ZooKeeperBenchmark {
 						// Record the time elapsed and current rate
 						String msg =
 								((double) (_currentCpuTime - _startCpuTime) / 1000000000.0) + " "
-										+ ((double) (finished - _lastfinished)
-												/ ((double) (_currentCpuTime - _lastCpuTime)
-														/ 1000000000.0));
+										+ ((double) (finished - _lastfinished) / ((double) (_currentCpuTime - _lastCpuTime) / 1000000000.0));
 
 						// Break it down:
 						// This: ((double) (_currentCpuTime - _startCpuTime) / 1000000000.0)
