@@ -20,6 +20,7 @@ import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.retry.RetryNTimes;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.locks.InterProcessMutex;
 
 import edu.brown.cs.zkbenchmark.ZooKeeperBenchmark.TestType;
 
@@ -36,11 +37,8 @@ public abstract class BenchmarkClient implements Runnable {
 	protected Timer _timer;
 	protected String _lockRoot = "/lock-root";
 	protected String _lockPath = _lockRoot + "/lock-";
-
-	protected int _highestN;
-	protected int _highestDeleted;
-
 	protected BufferedWriter _latenciesFile;
+	protected InterProcessMutex _mutex;
 
 	private static final Logger LOG = Logger.getLogger(BenchmarkClient.class);
 
@@ -58,9 +56,9 @@ public abstract class BenchmarkClient implements Runnable {
 		_id = id; // This clients index. Essentially, what server does this client connect to and
 					// handle?
 		_path = "/client" + id;
+		// _path = "/contention";
 		_timer = new Timer();
-		_highestN = 0;
-		_highestDeleted = 0;
+		_mutex = new InterProcessMutex(_client, _lockRoot);
 	}
 
 	// Where multithread execution begins
@@ -99,14 +97,26 @@ public abstract class BenchmarkClient implements Runnable {
 			// like the whole point is to be synchronizing. what's the point if nobody ever
 			// reads what you write
 			// Can we potentially do something where we introduce a BIT of contention?
-			Stat stat = _client.checkExists().forPath(_path);
-			if (stat == null) {
-				_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
+			if (_path.equals("/contention")) {
+				if (_id == 0) {
+					Stat stat = _client.checkExists().forPath(_path);
+					if (stat == null) {
+						_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
+					}
+				}
+			} else {
+				Stat stat = _client.checkExists().forPath(_path);
+				if (stat == null) {
+					_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
+				}
+				stat = _client.checkExists().forPath(_lockRoot);
+				if (stat == null) {
+					_client.create().forPath(_lockRoot, new byte[0]);
+				}
 			}
-			stat = _client.checkExists().forPath(_lockRoot);
-			if (stat == null) {
-				_client.create().forPath(_lockRoot, new byte[0]);
-			}
+			
+
+
 
 		} catch (Exception e) {
 			LOG.error("Error while creating working directory", e);
@@ -123,7 +133,7 @@ public abstract class BenchmarkClient implements Runnable {
 		// Create a new output file for this particular client
 		try {
 
-			if (_type == TestType.READ || _type == TestType.WRITESYNCREAD || _type == TestType.AR) {
+			if (_type == TestType.READ || _type == TestType.WRITESYNCREAD || _type == TestType.AR || _type == TestType.MUTEX) {
 				_latenciesFile = new BufferedWriter(new FileWriter(
 						new File("results/last/" + _id + "-" + _type + "_timings.dat")));
 			} else if (_type == TestType.MIXREADWRITE) {
@@ -206,7 +216,7 @@ public abstract class BenchmarkClient implements Runnable {
 	/* Delete all the child znodes created by this client */
 	void deleteChildren() throws Exception {
 		List<String> children;
-
+		
 		do {
 			children = _client.getChildren().forPath(_path);
 			for (String child : children) {

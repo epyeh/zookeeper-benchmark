@@ -181,6 +181,16 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 					}
 					break;
 
+				case MUTEX:
+				
+					while (!_mutex.acquire((long) 1000, TimeUnit.MILLISECONDS)) {
+						LOG.info("Client #" + _id + " fails to acquire the lock, retry");
+					}
+					LOG.info("Client #" + _id + " acquires the lock");
+					_mutex.release();
+					LOG.info("Client #" + _id + " releases the lock");
+					break;
+
 				case UNDEFINED:
 					LOG.error("Test type was UNDEFINED. No tests executed");
 					break;
