@@ -154,13 +154,12 @@ public class ZooKeeperBenchmark {
 		 * read test doesn't reflect the actual rate of read requests.
 		 */
 
-		doTest(TestType.READ, "warm-up");
+		// doTest(TestType.READ, "warm-up");
 
 		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
 		// This loop increments i by 10% each time. i represents the read percentage. ie
 		// the percentage of reads for this workload
-
 		// for (int i = 0; i <= 100; i += 10) {
 		// 	_readPercentage = i / 100.0;
 		// 	doTest(TestType.MIXREADWRITE, "mixed read and write to znode");
@@ -174,6 +173,7 @@ public class ZooKeeperBenchmark {
 
 		LOG.info("Tests completed, now cleaning-up");
 
+		_finished = false;
 		for (int i = 0; i < _clients.length; i++) {
 			_clients[i].setTest(TestType.CLEANING);
 			Thread tmp = new Thread(_clients[i]);

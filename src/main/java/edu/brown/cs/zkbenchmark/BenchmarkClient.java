@@ -55,8 +55,8 @@ public abstract class BenchmarkClient implements Runnable {
 		_attempts = attempts; // This is avgOps. The average # of operations to send to the server
 		_id = id; // This clients index. Essentially, what server does this client connect to and
 					// handle?
-		_path = "/client" + id;
-		// _path = "/contention";
+		// _path = "/client" + id;
+		_path = "/contention";
 		_timer = new Timer();
 		_mutex = new InterProcessMutex(_client, _lockRoot);
 	}
@@ -72,6 +72,19 @@ public abstract class BenchmarkClient implements Runnable {
 		if (_type == TestType.CLEANING) {
 			doCleaning();
 			return;
+		}
+
+		if (_path.equals("/contention")) {
+			if (_id == 0) {
+				try {
+					Stat stat = _client.checkExists().forPath(_path);
+					if (stat == null) {
+						_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
+					}
+				} catch (Exception e) {
+					LOG.error("Cannot create working directory '/contention'");
+				}
+			}
 		}
 
 		zkAdminCommand("srst"); // Reset ZK server's statistics
@@ -90,34 +103,20 @@ public abstract class BenchmarkClient implements Runnable {
 
 		// Create a directory to work in
 		try {
-			// Check if path exits.
-			// Each client thread will have their own node that they write to avoid conflict
-			// Eric: Is this a really useful usecase? This completely avoids the issue of
-			// zookeeper.
-			// like the whole point is to be synchronizing. what's the point if nobody ever
-			// reads what you write
-			// Can we potentially do something where we introduce a BIT of contention?
 			if (_path.equals("/contention")) {
-				if (_id == 0) {
-					Stat stat = _client.checkExists().forPath(_path);
-					if (stat == null) {
-						_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
-					}
-				}
+				// do nothing
 			} else {
 				Stat stat = _client.checkExists().forPath(_path);
 				if (stat == null) {
 					_client.create().forPath(_path, _zkBenchmark.getData().getBytes());
 				}
-				stat = _client.checkExists().forPath(_lockRoot);
-				if (stat == null) {
-					_client.create().forPath(_lockRoot, new byte[0]);
+				if (_id == 0) {
+					stat = _client.checkExists().forPath(_lockRoot);
+					if (stat == null) {
+						_client.create().forPath(_lockRoot, new byte[0]);
+					}
 				}
 			}
-			
-
-
-
 		} catch (Exception e) {
 			LOG.error("Error while creating working directory", e);
 		}
@@ -132,7 +131,6 @@ public abstract class BenchmarkClient implements Runnable {
 
 		// Create a new output file for this particular client
 		try {
-
 			if (_type == TestType.READ || _type == TestType.WRITESYNCREAD || _type == TestType.AR || _type == TestType.MUTEX) {
 				_latenciesFile = new BufferedWriter(new FileWriter(
 						new File("results/last/" + _id + "-" + _type + "_timings.dat")));
@@ -154,8 +152,8 @@ public abstract class BenchmarkClient implements Runnable {
 
 		// Test is complete. Print some stats and go home.
 		// Zookeeper server keeps track of some stats. This zkAdminCommand
-		// Tells zookeeper to execute the "stat" command and give the stats back to this
-		// running thread
+		// Tells zookeeper to execute the "stat" command and give the stats
+		// back to this running thread
 		zkAdminCommand("stat");
 
 		// Clean up by closing files and logging completion time
@@ -163,7 +161,6 @@ public abstract class BenchmarkClient implements Runnable {
 			if (_latenciesFile != null) {
 				_latenciesFile.close();
 			}
-
 		} catch (IOException e) {
 			LOG.warn("Error while closing output file:", e);
 		}
@@ -217,13 +214,27 @@ public abstract class BenchmarkClient implements Runnable {
 	void deleteChildren() throws Exception {
 		List<String> children;
 		
-		do {
-			children = _client.getChildren().forPath(_path);
-			for (String child : children) {
-				_client.delete().inBackground().forPath(_path + "/" + child);
-			}
-			Thread.sleep(2000);
-		} while (children.size() != 0);
+		// do {
+		// 	children = _client.getChildren().forPath(_path);
+		// 	for (String child : children) {
+		// 		_client.delete().inBackground().forPath(_path + "/" + child);
+		// 	}
+		// 	Thread.sleep(2000);
+		// } while (children.size() != 0);
+
+		if (_id == 0) {
+			do {
+				children = _client.getChildren().forPath("/");
+				System.out.println("To Clean: " + children);
+				for (String child : children) {
+					try {
+						_client.delete().forPath("/" + child);
+					} catch (Exception e) {
+						LOG.info(child + " has been deleted");
+					}
+				}
+			} while (children.size() != 0);
+		}
 	}
 
 	void recordEvent(CuratorEvent event) {
