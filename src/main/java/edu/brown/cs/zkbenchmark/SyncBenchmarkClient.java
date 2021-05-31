@@ -86,6 +86,7 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 
 				case WRITESYNCREAD:
 
+					// First Write Sync
 					// Synchrnous Write
 					data = new String(_zkBenchmark.getData() + i).getBytes();
 					_client.setData().forPath(_path, data);
@@ -101,10 +102,42 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 								+ " seconds. This should not happen.");
 					}
 
+					// Second Write-Sync
+					// Synchrnous Write
+					data = new String(_zkBenchmark.getData() + i).getBytes();
+					_client.setData().forPath(_path, data);
+					_zkBenchmark.incrementFinished();
+
+					// Synchronous Sync
+					// 5 seconds for sync to return or we get false
+					res = this.synchronousSync(Duration.ofSeconds(TIMEOUT_DURATION)); 
+					if (!res) {
+						System.out.println("Sync did not return within " + TIMEOUT_DURATION
+								+ " seconds. This should not happen!!");
+						LOG.error("Sync did not return within " + TIMEOUT_DURATION
+								+ " seconds. This should not happen.");
+					}
+
+					// Third Write-Sync
+					// Synchrnous Write
+					data = new String(_zkBenchmark.getData() + i).getBytes();
+					_client.setData().forPath(_path, data);
+					_zkBenchmark.incrementFinished();
+
+					// Synchronous Sync
+					// 5 seconds for sync to return or we get false
+					res = this.synchronousSync(Duration.ofSeconds(TIMEOUT_DURATION)); 
+					if (!res) {
+						System.out.println("Sync did not return within " + TIMEOUT_DURATION
+								+ " seconds. This should not happen!!");
+						LOG.error("Sync did not return within " + TIMEOUT_DURATION
+								+ " seconds. This should not happen.");
+					}
+
 					// Synchronous Read
 					_client.getData().forPath(_path);
 					break;
-
+				
 				case AR:
 				
 					String mynode = "";
@@ -134,35 +167,36 @@ public class SyncBenchmarkClient extends BenchmarkClient {
 							break;
 						} else {
 							int idx = children.indexOf(nodeName);
-							String previousNode = "/" + children.get(idx - 1);
+							String previousNode = _lockRoot + "/" + children.get(idx - 1);
 
 							try {
 								final CountDownLatch latch = new CountDownLatch(1);
-								Stat stat =
-										_client.checkExists().usingWatcher(new CuratorWatcher() {
-											@Override
-											public void process(WatchedEvent event)
-													throws Exception {
-												// LOG.info("event: " + event);
-												LOG.info("Counting down latch for: " + "Client #"
-														+ _id);
-												latch.countDown();
-											}
-										}).forPath(previousNode);
+								Stat stat = 
+									_client.checkExists().usingWatcher(new CuratorWatcher() {
+										@Override
+										public void process(WatchedEvent event)
+												throws Exception {
+											// LOG.info("event: " + event);
+											LOG.info("Counting down latch for: " + "Client #"
+													+ _id);
+											latch.countDown();
+										}
+									}).forPath(previousNode);
 
-										_zkBenchmark.incrementFinished();
+								_zkBenchmark.incrementFinished();
 
 								if (stat != null) {
 									LOG.info(
 											"Client #" + _id + " watches the lock " + previousNode);
 									latch.await();
 								} else {
-									LOG.info("stat is null for: Client #" + _id
-											+ " immediately retry to acquire lock by calling getChildren");
+									LOG.info("stat is null for Client #" + _id + " checking " + previousNode
+											+ ", immediately retry to acquire lock by calling getChildren" );
 								}
 
 							} catch (Exception e) {
-								LOG.error("Error: " + e);
+								LOG.info("sync fails while client #" + _id + " tries to sync" + previousNode);
+								// LOG.error("Error: " + e);
 							}
 						}
 					}

@@ -55,8 +55,8 @@ public abstract class BenchmarkClient implements Runnable {
 		_attempts = attempts; // This is avgOps. The average # of operations to send to the server
 		_id = id; // This clients index. Essentially, what server does this client connect to and
 					// handle?
-		// _path = "/client" + id;
-		_path = "/contention";
+		_path = "/client" + id;
+		// _path = "/contention";
 		_timer = new Timer();
 		_mutex = new InterProcessMutex(_client, _lockRoot);
 	}

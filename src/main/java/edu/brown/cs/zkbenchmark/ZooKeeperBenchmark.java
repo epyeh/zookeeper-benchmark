@@ -154,7 +154,7 @@ public class ZooKeeperBenchmark {
 		 * read test doesn't reflect the actual rate of read requests.
 		 */
 
-		// doTest(TestType.READ, "warm-up");
+		doTest(TestType.READ, "warm-up");
 
 		// doTest(TestType.READ, "znode read"); // Do twice to allow for warm-up
 
